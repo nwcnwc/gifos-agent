@@ -1,0 +1,35 @@
+{
+  "name": "@gifos/agent",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting page's own window.gifosAgent API (text, speech and video).",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.js"
+  },
+  "dependencies": {
+    "playwright": "1.61.1"
+  },
+  "peerDependencies": {
+    "kokoro-js": "1.2.1"
+  },
+  "peerDependenciesMeta": {
+    "kokoro-js": {
+      "optional": true
+    }
+  },
+  "author": "Crowd Concepts, Inc. (https://gifos.app)"
+}
