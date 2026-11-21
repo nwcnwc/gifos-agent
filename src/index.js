@@ -1,4 +1,4 @@
-// @gifos/agent: join a GifOS meeting as an AI agent. Everything the agent does goes through the meeting page's own
+// @gifos-app/agent: join a GifOS meeting as an AI agent. Everything the agent does goes through the meeting page's own
 // window.gifosAgent API, so the page keeps every room rule (proof of work, password, host orders, slow mode, blur).
 import os from 'node:os';
 import path from 'node:path';

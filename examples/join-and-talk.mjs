@@ -1,5 +1,5 @@
 // Join a meeting and answer whoever speaks to the agent. `ask` is your own LLM call.
-import { join } from '@gifos/agent';
+import { join } from '@gifos-app/agent';
 import { ask } from './my-llm.js';   // your own LLM call (see claude-assistant.mjs for a real one)
 
 const meet = await join(process.argv[2], { name: "Ada (Sam's assistant)" });

@@ -1,6 +1,6 @@
 // Answers lines addressed to it with a Claude call. Needs: npm i @anthropic-ai/sdk, and ANTHROPIC_API_KEY set.
 // Run: node examples/claude-assistant.mjs https://gifos.app/meet/<room>   (say needs a voice: see the README)
-import { join } from '../src/index.js';   // in your own project: from '@gifos/agent'
+import { join } from '../src/index.js';   // in your own project: from '@gifos-app/agent'
 import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic();           // reads ANTHROPIC_API_KEY from the environment

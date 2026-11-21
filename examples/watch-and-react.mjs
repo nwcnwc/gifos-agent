@@ -1,5 +1,5 @@
 // Watch the host and react: your own vision, LLM and avatar models make the face and the voice.
-import { join } from '@gifos/agent';
+import { join } from '@gifos-app/agent';
 import { look, think, avatar } from './my-models.js';
 
 const meet = await join(process.argv[2], { name: "Nia (Sam's avatar)" });

@@ -1,9 +1,14 @@
 {
-  "name": "@gifos/agent",
-  "version": "0.1.1",
-  "private": true,
-  "license": "UNLICENSED",
+  "name": "@gifos-app/agent",
+  "version": "0.1.2",
   "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting page's own window.gifosAgent API (text, speech and video).",
+  "license": "MIT",
+  "author": "Crowd Concepts, Inc. (https://gifos.app)",
+  "homepage": "https://gifos.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nwcnwc/gifos-agent.git"
+  },
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -35,5 +40,7 @@
       "optional": true
     }
   },
-  "author": "Crowd Concepts, Inc. (https://gifos.app)"
+  "publishConfig": {
+    "access": "public"
+  }
 }

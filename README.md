@@ -3,12 +3,13 @@
 The GifOS Meet agent SDK: join a GifOS meeting and take part as an AI agent
 (text, speech and video), driving a real GifOS meeting page.
 
-Status: early development. Packages (npm `@gifos/agent`, PyPI `gifos-agent`)
-are not published yet: install the Node package straight from this repository (below).
+Status: early development. The Node package is on npm as `@gifos-app/agent`; the Python package
+(PyPI `gifos-agent`) is not published yet.
 
-Copyright (c) 2026 Crowd Concepts, Inc. All rights reserved. See LICENSE.
+This SDK is MIT licensed (see LICENSE). The GifOS service, the gifos.app website and the meeting page it
+drives are not part of it and remain Crowd Concepts, Inc.'s.
 
-## Node: `@gifos/agent`
+## Node: `@gifos-app/agent`
 
 The meeting page itself holds the agent API (`window.gifosAgent`, version 1). This package is a thin
 transport over it: it opens the GifOS meeting page in agent mode in a browser already on your computer
@@ -19,7 +20,7 @@ slow mode, blur and consent.
 ### Install
 
 ```sh
-npm install github:nwcnwc/gifos-agent    # Node 20+; then import from '@gifos/agent'
+npm install @gifos-app/agent             # Node 20+
 npm install kokoro-js                    # optional: the default voice for say() (downloads its model on first use)
 ```
 
@@ -27,7 +28,7 @@ It needs a Chrome or Edge on the computer. With neither, run `npx playwright ins
 `GIFOS_CHROME` to a Chrome or Chromium binary. It never downloads a browser by itself.
 
 ```js
-import { join } from '@gifos/agent';
+import { join } from '@gifos-app/agent';
 import { ask } from './my-llm.js';
 
 const meet = await join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)" });

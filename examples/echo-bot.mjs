@@ -1,7 +1,7 @@
 // A bot with no model and no keys: fixed rules over the SDK.
 // Run: node examples/echo-bot.mjs https://gifos.app/meet/<room>   (needs espeak-ng for its voice)
 // Say to it in chat: "hi", "raise your hand", "lower your hand", "what do you see", "leave".
-import { join } from '../src/index.js';   // in your own project: from '@gifos/agent'
+import { join } from '../src/index.js';   // in your own project: from '@gifos-app/agent'
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
