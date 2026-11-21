@@ -1,6 +1,6 @@
 {
   "name": "@gifos/agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "UNLICENSED",
   "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting page's own window.gifosAgent API (text, speech and video).",
