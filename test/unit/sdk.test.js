@@ -70,6 +70,16 @@ test('say(): the SDK makes the voice, the page plays it and writes the words; re
   await assert.rejects(new Meeting(fakeTransport()).say('x'), /No voice/);
 });
 
+test('say(): a say.done that arrives before the page answers the call still resolves it', async () => {
+  // A busy page can finish a short clip before the answer to the say call reaches Node.
+  let t;
+  t = fakeTransport({ say: () => { t.emit('say.done', { id: 'say7', stopped: false }); return { ok: true, id: 'say7', ms: 50 }; } });
+  const meet = new Meeting(t, { tts: async () => ({ pcm: new Int16Array(240), rate: 24000 }) });
+  const r = await Promise.race([meet.say('Quick'), new Promise((res) => setTimeout(() => res('hung'), 500))]);
+  assert.notEqual(r, 'hung', 'say() waited for a say.done that had already come');
+  assert.equal(r.id, 'say7');
+});
+
 test('video.in: frames come only from the port that was opened; close stops it', async () => {
   const t = fakeTransport({ 'video.in.open': () => ({ ok: true, port: 'video.in:1', source: 'direct', blurred: true }) });
   const meet = new Meeting(t);

@@ -9,8 +9,12 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "bin": {
+    "gifos-agent-bridge": "examples/shell-bridge.mjs"
+  },
   "files": [
     "src",
+    "examples",
     "README.md",
     "LICENSE"
   ],
