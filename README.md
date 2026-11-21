@@ -4,7 +4,7 @@ The GifOS Meet agent SDK: join a GifOS meeting and take part as an AI agent
 (text, speech and video), driving a real GifOS meeting page.
 
 Status: early development. Packages (npm `@gifos/agent`, PyPI `gifos-agent`)
-are not published yet.
+are not published yet: install the Node package straight from this repository (below).
 
 Copyright (c) 2026 Crowd Concepts, Inc. All rights reserved. See LICENSE.
 
@@ -15,6 +15,16 @@ transport over it: it opens the GifOS meeting page in agent mode in a browser al
 (Chrome, Edge, or a Chromium you installed for Playwright; it never downloads one) and carries the
 page's events and actions. The page keeps every room rule: proof of work, passwords, the host's orders,
 slow mode, blur and consent.
+
+### Install
+
+```sh
+npm install github:nwcnwc/gifos-agent    # Node 20+; then import from '@gifos/agent'
+npm install kokoro-js                    # optional: the default voice for say() (downloads its model on first use)
+```
+
+It needs a Chrome or Edge on the computer. With neither, run `npx playwright install chromium` once, or set
+`GIFOS_CHROME` to a Chrome or Chromium binary. It never downloads a browser by itself.
 
 ```js
 import { join } from '@gifos/agent';
@@ -32,6 +42,26 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 
 More in `examples/` (a watch-and-react avatar with video in and out).
 
+### If you are an AI agent with a shell (Claude Code, Codex and the like)
+
+You are the language model, so there is no `ask()` to write: keep ONE Node process in the meeting and talk to it
+through files. `gifos-agent-bridge` (examples/shell-bridge.mjs, installed with the package) is that process:
+
+```sh
+npx gifos-agent-bridge https://gifos.app/meet/abc --name "Ada (Sam's assistant)" --dir ./meeting > bridge.log 2>&1 &
+npx gifos-agent-bridge next --dir ./meeting                       # waits for the next line said TO YOU, prints it
+echo '{"do":"chat","text":"391"}' >> ./meeting/commands.jsonl     # results come back in ./meeting/results.jsonl
+```
+
+Loop on `next`: wait for the next request, do it, run `next` again. That keeps you in the meeting for as long as
+the person needs you (a `next` with nothing new exits after `--wait` seconds, default 100, under a shell tool's usual 2-minute limit: just run it again).
+Everything else that happens (people, hand, stage, video, left) is in `./meeting/events.jsonl`.
+
+Commands: `chat`, `say` (needs a voice), `hand`, `stage`, `unstage`, `camera` (a JPEG file as your video),
+`look` (save one frame of someone's camera as a JPEG you can open), `people`, `leave`. Do not end
+your turn while the person still needs you: the meeting goes on without you reading it. The bridge leaves the
+meeting when its process exits. A locked room's password comes from your human, never a guess.
+
 ### What you get
 - `join(url, { name, owner?, tts?, password?, profile? })`: the name must say whose agent it is
   ("Ada (Sam's assistant)"). A password is never guessed: without one, a locked room is an error to show your human.
@@ -45,7 +75,8 @@ More in `examples/` (a watch-and-react avatar with video in and out).
   open one), `video.out.open({width, height, fps})` (your agent's camera, under the same blur and consent rules).
 - `meet.tools()`: the actions as JSON-schema tools for any LLM loop.
 
-`say` needs a voice: install `kokoro-js` for the default one, or pass `tts: async (text) => ({ pcm, rate })`.
+`say` needs a voice: install `kokoro-js` for the default one, or pass `tts: async (text) => ({ pcm, rate })` (or
+`({ wav })`, for example from `espeak-ng -w`). Without one, `say` rejects with "No voice": answer in chat instead.
 
 Subscribing to lines or room audio marks the agent's tile "taking notes". In a hosted meeting the host's
 "AI notes" setting (allowed / ask / off) is obeyed by the page.
