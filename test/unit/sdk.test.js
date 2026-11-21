@@ -116,3 +116,15 @@ test('helpers: agent address, room, WAV, browser order', () => {
   assert.deepEqual(candidates({ GIFOS_CHROME: '/x' }).map((c) => c.name), ['GIFOS_CHROME']);
   assert.deepEqual(candidates({}, 'linux', () => false, '/pw').map((c) => c.name), ['Playwright Chromium']);
 });
+
+test('join() drives a Playwright chromium the caller hands it', async () => {
+  const { join } = await import('../../src/index.js');
+  const seen = [];
+  const chromium = {
+    executablePath: () => process.execPath,   // a file that exists: the SDK's last candidate
+    async launchPersistentContext(dir, o) { seen.push({ dir, headless: o.headless }); throw new Error('no browser in this test'); },
+  };
+  await assert.rejects(join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)", chromium, profile: '/nonexistent/agent-profile' }), /Chrome or Edge|GIFOS_CHROME/);
+  assert.ok(seen.length >= 1, 'the given chromium was asked to launch');
+  assert.equal(seen[0].dir, '/nonexistent/agent-profile');
+});

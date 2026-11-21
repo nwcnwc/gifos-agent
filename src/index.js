@@ -47,10 +47,11 @@ function seated(meet, ms) {
   });
 }
 
-// join(url, { name, owner?, tts?, voice?, password?, relay?, profile?, headless?, joinMs? }) -> Meeting
+// join(url, { name, owner?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium? }) -> Meeting
+// chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
 export async function join(url, opts = {}) {
   const name = agentName(opts.name, opts.owner);
-  const { chromium } = await import('playwright');
+  const chromium = opts.chromium || (await import('playwright')).chromium;
   // The agent's own profile keeps its person key, so it is the same person across joins.
   const profile = opts.profile || path.join(os.homedir(), '.gifos-agent', slug(name) + '-' + crypto.createHash('sha256').update(name).digest('hex').slice(0, 6));
   const { context, used } = await launch(chromium, profile, opts);

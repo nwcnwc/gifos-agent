@@ -35,6 +35,7 @@ More in `examples/` (a watch-and-react avatar with video in and out).
 ### What you get
 - `join(url, { name, owner?, tts?, password?, profile? })`: the name must say whose agent it is
   ("Ada (Sam's assistant)"). A password is never guessed: without one, a locked room is an error to show your human.
+  `chromium`: a Playwright `chromium` you already load, to drive your own Playwright install.
 - `meet.lines({ toMe, trusted, fromAdmin, kinds })`: an async iterator of lines (speech, chat), each with the
   speaker, `trust` (`own`, `trusted`, `unchecked`, `distrusted`: captions are claims, not facts) and `toMe`.
 - `meet.on(event, fn)`: `joined`, `people`, `speaking`, `line`, `hand`, `stage`, `agenda`, `video`, `app`, `host`, `left`.
