@@ -93,10 +93,21 @@ export class Meeting {
     if (!tts) throw new Error('No voice: pass { tts } to join(), or install kokoro-js.');
     const v = await tts(String(text), opts);
     const wav = v.wav ? v.wav : toWav(v.pcm, v.rate);
-    const r = await this.call('say', { text: String(text), wav: b64(wav), interrupt: opts.interrupt || 'stop' });
-    if (opts.wait === false) return r;
+    // Listen before calling: a busy page can finish a short clip before its answer to the call reaches us.
+    const ended = new Map();
+    const waiters = new Map();
+    const off = this.on('say.done', (d) => {
+      if (!d || !d.id) return;
+      const w = waiters.get(d.id);
+      if (w) w(d); else ended.set(d.id, d);
+    });
+    let r;
+    try { r = await this.call('say', { text: String(text), wav: b64(wav), interrupt: opts.interrupt || 'stop' }); }
+    catch (e) { off(); throw e; }
+    if (opts.wait === false) { off(); return r; }
     return new Promise((resolve) => {
-      const off = this.on('say.done', (d) => { if (d && d.id === r.id) { off(); resolve({ ...r, ...d }); } });
+      const finish = (d) => { off(); resolve({ ...r, ...d }); };
+      if (ended.has(r.id)) finish(ended.get(r.id)); else waiters.set(r.id, finish);
     });
   }
   stopSaying() { return this.call('say.stop'); }
