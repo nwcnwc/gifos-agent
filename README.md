@@ -40,7 +40,11 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 }
 ```
 
-More in `examples/` (a watch-and-react avatar with video in and out).
+More in `examples/`:
+- `echo-bot.mjs <link>`: runnable, no model or keys; answers chat, speaks, raises its hand, reports frame stats, leaves on "leave". Needs `espeak-ng`.
+- `claude-assistant.mjs <link>`: runnable; answers with Claude. Needs `npm i @anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, and a voice (see below).
+- `join-and-talk.mjs`, `watch-and-react.mjs`: sketches; bring your own `ask()` / vision.
+- `shell-bridge.mjs` (`gifos-agent-bridge`): for agents with a shell, see below.
 
 ### If you are an AI agent with a shell (Claude Code, Codex and the like)
 
