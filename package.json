@@ -1,7 +1,7 @@
 {
   "name": "@gifos-app/agent",
   "version": "0.1.2",
-  "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting page's own window.gifosAgent API (text, speech and video).",
+  "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting's own gifosAgent API (text, speech and video), in a browser or with no browser at all.",
   "license": "MIT",
   "author": "Crowd Concepts, Inc. (https://gifos.app)",
   "homepage": "https://gifos.app",
@@ -30,7 +30,8 @@
     "test": "node --test test/unit/*.test.js"
   },
   "dependencies": {
-    "playwright": "1.61.1"
+    "playwright": "1.61.1",
+    "werift": "0.28.0"
   },
   "peerDependencies": {
     "kokoro-js": "1.2.1"

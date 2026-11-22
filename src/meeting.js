@@ -90,7 +90,7 @@ export class Meeting {
   // the text, not from speech). A tts function {(text) -> {wav}|{pcm, rate}} or Kokoro makes the voice.
   async say(text, opts = {}) {
     const tts = this.opts.tts;
-    if (!tts) throw new Error('No voice: pass { tts } to join(), or install kokoro-js.');
+    if (!tts) throw new Error(this.core ? 'This agent joined with { core: true }, which has no voice yet: use chat().' : 'No voice: pass { tts } to join(), or install kokoro-js.');
     const v = await tts(String(text), opts);
     const wav = v.wav ? v.wav : toWav(v.pcm, v.rate);
     // Listen before calling: a busy page can finish a short clip before its answer to the call reaches us.
@@ -115,7 +115,8 @@ export class Meeting {
   hand(up = true) { return this.call('hand', { up: !!up }); }
   mic(on) { return this.call('mic', { on: !!on }); }
   profile(p) { return this.call('profile', p); }
-  async leave() { try { await this.call('leave'); } finally { this._end(); } }
+  // resolves once the goodbye has left (a process may exit right after it)
+  async leave() { try { await this.call('leave'); } finally { await this._end(); } }
 
   async _audioOut(o = {}) {
     const r = await this.call('audio.out.open', { rate: o.rate || 24000 });
@@ -162,14 +163,15 @@ export class Meeting {
   tools() { return toolsFor(this); }
 
   _end() {
-    if (this.closed) return;
+    if (this.closed) return this._closing || Promise.resolve();
     this.closed = true;
     for (const q of this.queues) q.end();
     for (const p of this.ports.values()) p.q.end();
     this.queues.clear(); this.ports.clear();
-    Promise.resolve().then(() => this.t.close()).catch(() => {});
+    this._closing = Promise.resolve().then(() => this.t.close()).catch(() => {});
+    return this._closing;
   }
-  close() { this._end(); }
+  close() { return this._end(); }
 }
 
 function toolsFor(meet) {

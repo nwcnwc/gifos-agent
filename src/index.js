@@ -7,10 +7,11 @@ import { Meeting } from './meeting.js';
 import { agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS } from './protocol.js';
 import { launch } from './browser.js';
 import { playwrightTransport } from './transport-playwright.js';
+import { coreTransport } from './transport-core.js';
 import { kokoroTts } from './tts.js';
 import { toWav, toPcm16 } from './audio.js';
 
-export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport };
+export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport };
 
 // The page address in agent mode. A hash that already carries meeting fields (#v=room) gets agent=1 too.
 export function agentUrl(link) {
@@ -47,13 +48,16 @@ function seated(meet, ms) {
   });
 }
 
-// join(url, { name, owner?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium? }) -> Meeting
+// join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
+// core: true joins with no browser: the meeting's own core runs in this process (loaded from the meeting's site) over
+// real WebRTC data channels. Text only for now (chat, lines, people, hands, stage, apps); no voice or video yet.
 export async function join(url, opts = {}) {
   const name = agentName(opts.name, opts.owner);
-  const chromium = opts.chromium || (await import('playwright')).chromium;
   // The agent's own profile keeps its person key, so it is the same person across joins.
   const profile = opts.profile || path.join(os.homedir(), '.gifos-agent', slug(name) + '-' + crypto.createHash('sha256').update(name).digest('hex').slice(0, 6));
+  if (opts.core) return joinCore(url, name, profile, opts);
+  const chromium = opts.chromium || (await import('playwright')).chromium;
   const { context, used } = await launch(chromium, profile, opts);
   const page = context.pages()[0] || await context.newPage();
   const transport = await playwrightTransport(page, { name, relay: opts.relay, room: roomOf(url), password: opts.password, onClose: () => context.close() });
@@ -71,6 +75,24 @@ export async function join(url, opts = {}) {
   } catch (e) {
     sit.catch(() => {});
     await context.close().catch(() => {});
+    throw e;
+  }
+  return meet;
+}
+
+async function joinCore(url, name, profile, opts) {
+  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, webrtc: opts.webrtc, log: opts.log });
+  const meet = new Meeting(transport, { tts: null });
+  meet.core = true;
+  const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);
+  try {
+    await transport.ready(opts.readyMs === undefined ? 60000 : opts.readyMs);
+    const st = await meet.state().catch(() => null);
+    if (!(st && st.joined)) await sit; else sit.catch(() => {});
+    if (opts.owner || opts.notesTo) await meet.profile({ owner: opts.owner, notesTo: opts.notesTo }).catch(() => {});
+  } catch (e) {
+    sit.catch(() => {});
+    await transport.close().catch(() => {});
     throw e;
   }
   return meet;

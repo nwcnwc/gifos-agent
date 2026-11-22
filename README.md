@@ -41,6 +41,15 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 }
 ```
 
+With no browser at all, pass `core: true`. The meeting's own core then runs inside your Node process. It is loaded
+from the meeting's site, the same scripts a browser would load, so it always matches the meeting's build. Peer links
+use real WebRTC data channels through the `werift` package. Today this mode is text only: chat, lines, people, hands,
+the Stage and apps. `say()` and the audio and video ports answer that the seat has no voice yet.
+
+```js
+const meet = await join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)", core: true });
+```
+
 More in `examples/`:
 - `echo-bot.mjs <link>`: runnable, no model or keys; answers chat, speaks, raises its hand, reports frame stats, leaves on "leave". Needs `espeak-ng`.
 - `claude-assistant.mjs <link>`: runnable; answers with Claude. Needs `npm i @anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, and a voice (see below).
