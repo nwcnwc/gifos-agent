@@ -42,6 +42,8 @@ export class Meeting {
       run: (id) => this.call('app.run', { id }),
       stop: () => this.call('app.stop'),
       room: (op, args) => this.call('app.room', { op, args }),
+      // the shared app's data, as the app itself reads and writes it: get, getAll, put, delete
+      data: (op, collection, key, value) => this.call('app.data', { op, collection, key, value }),
     };
     this.agenda = { next: () => this.call('agenda.next'), set: (items) => this.call('agenda.set', { items }) };
   }

@@ -15,7 +15,7 @@ export const EVENTS = [
 export const ACTIONS = [
   'state', 'people', 'lines',
   'say', 'say.stop', 'chat', 'hand', 'mic', 'stage.ask', 'stage.leave',
-  'app.run', 'app.stop', 'app.room', 'agenda.next', 'agenda.set', 'profile', 'leave',
+  'app.run', 'app.stop', 'app.room', 'app.data', 'agenda.next', 'agenda.set', 'profile', 'leave',
   'audio.out.open', 'audio.out.write', 'audio.out.clear', 'audio.out.close',
   'audio.in.open', 'audio.in.close',
   'video.in.open', 'video.in.close',
