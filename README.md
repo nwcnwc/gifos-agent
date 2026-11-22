@@ -50,7 +50,16 @@ the Stage and apps. `say()` and the audio and video ports answer that the seat h
 const meet = await join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)", core: true });
 ```
 
+Core mode needs Node 22 or later and no browser. The agent is the same person across joins: its key lives in its
+profile folder (`~/.gifos-agent/<name>` by default, or `{ profile }`). Apps shared into the meeting are open to it
+through their data, as the app itself reads and writes it. `meet.app.room('state')` gives the app's people and its
+gifos.room session (`join`, `move` and `newRound` go through `meet.app.room(op, args)`), and `meet.app.data(op,
+collection, key, value)` reads and writes the app's shared collections (`get`, `getAll`, `put`, `delete`). Every room
+rule still holds: proof of work, the password, slow mode, the host's lead in a hosted room. `examples/core-bot.mjs` is
+a runnable bot with no browser: it answers chat, raises its hand, and takes a turn in Take Turns.
+
 More in `examples/`:
+- `core-bot.mjs <link>`: runnable, no browser, no model or keys (Node 22+); answers chat, raises its hand, takes a turn in Take Turns, leaves on "leave".
 - `echo-bot.mjs <link>`: runnable, no model or keys; answers chat, speaks, raises its hand, reports frame stats, leaves on "leave". Needs `espeak-ng`.
 - `claude-assistant.mjs <link>`: runnable; answers with Claude. Needs `npm i @anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, and a voice (see below).
 - `join-and-talk.mjs`, `watch-and-react.mjs`: sketches; bring your own `ask()` / vision.

@@ -54,6 +54,7 @@ function profileStore(dir) {
 
 // coreTransport(url, cfg): cfg = { name, relay?, room?, password?, profile?, webrtc?, fetch?, log? }
 export async function coreTransport(url, cfg = {}) {
+  if (+process.versions.node.split('.')[0] < 22) throw new Error('Joining with { core: true } needs Node 22 or later (this is Node ' + process.versions.node + ').');
   const fetchFn = cfg.fetch || globalThis.fetch;
   const origin = new URL(url).origin;
   const { host, site } = await loadHost(origin, fetchFn);
