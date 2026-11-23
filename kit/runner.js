@@ -52,7 +52,7 @@ export async function runBot(c, { join = sdkJoin, log = console.log, fetchFn, en
   let avatar = null;
   if (c.avatar.enabled) {
     try {
-      const port = await meet.video.out.open({ width: c.avatar.width, height: c.avatar.height, fps: c.avatar.fps });
+      const port = await meet.video.out.open({ width: c.avatar.width, height: c.avatar.height, fps: c.avatar.fps, blur: c.avatar.blur });
       avatar = new Avatar(await loadSet(c.avatar.set), c.avatar, port).start();
       note('avatar', { set: c.avatar.set, fps: c.avatar.fps, size: `${c.avatar.width}x${c.avatar.height}` });
     } catch (e) { note('avatar_off', { why: e.message }); }

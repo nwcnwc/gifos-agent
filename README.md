@@ -81,7 +81,7 @@ meeting when its process exits. A locked room's password comes from your human, 
   `leave`. Each resolves, or rejects with the page's own sentence.
 - Ports: `audio.out.open({rate})` (PCM16 in), `audio.in.open({who:'room', rate})` (PCM16 frames out),
   `video.in.open({who, fps, width})` (JPEG frames, blurred as the room blurs them; nothing is decoded until you
-  open one), `video.out.open({width, height, fps})` (your agent's camera, under the same blur and consent rules).
+  open one), `video.out.open({width, height, fps, blur})` (your agent's camera, under the same blur and consent rules; blur 0 No, 1 Min, 2 Max, the default).
 - `meet.tools()`: the actions as JSON-schema tools for any LLM loop.
 
 `say` needs a voice: install `kokoro-js` for the default one, or pass `tts: async (text) => ({ pcm, rate })` (or

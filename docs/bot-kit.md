@@ -51,7 +51,7 @@ npm install kokoro-js             # only for the on-device voice
 | `limits` | `replies_per_min` (whole room), `per_person_s` (cooldown per person), `max_reply_chars` (cut at a sentence end), `max_say_chars`, `greet_every_s`, `reply_timeout_s`, `bot_turns` (lines in a row from other bots it will answer). |
 | `answer` | `mention`: answer lines that say its name. `questions`: also any line ending in `?` (while it leads). |
 | `rank`, `siblings` | Several copies of one bot in a room: `{"Leo": 1}`. The lowest rank present greets and answers questions; a line naming a bot is answered by that bot. Siblings are matched by name among seats the page flags as bots. |
-| `brain`, `voice`, `avatar`, `greet` | Below. |
+| `brain`, `voice`, `avatar`, `greet` | Below. `avatar.blur` is the bot's own blur choice like anyone's camera: 0 No (default: a drawing shows no one), 1 Min, 2 Max. Rooms without a password blur every camera anyway. |
 
 Secrets never go in the config: the loader refuses `key`, `api_key`, `token`, `secret` and `password` fields. Name an
 environment variable (`key_env`) or a file outside your repo (`key_file`, e.g. mode 0600).
@@ -101,9 +101,12 @@ room treats it as any camera, so rooms without a password blur it. The states ar
 
 Fine detail (eyes, mouth) shows in password rooms, where video is clear.
 
-Cost: 160x120 at 6 fps while speaking or listening, 1 frame a second when idle. Drawing a frame takes well under a
-millisecond of CPU; the browser's video encoder is the larger cost (see the measured numbers in the GifOS welcome
-guide example).
+Cost: 160x120 at 6 fps while speaking or listening, 1 frame a second when idle. Measured on a desktop CPU: drawing
+takes about 1.1 ms a frame (under 1% of one core at 6 fps). The browser that encodes the camera is the larger cost.
+
+Measured per bot in browser mode (Node plus its Chrome, during a call with voice and avatar on): 1.4 to 1.5 GB of
+memory and 30 to 40% of one core. Node alone is about 180 MB without a voice model and 700 to 760 MB with Kokoro
+loaded; Kokoro also takes a few CPU seconds per spoken line. A cloud voice keeps that memory off your computer.
 
 Swap the look: `"set": "./my-avatar.js"`, a module that exports
 `frame(state, tMs, level, width, height, rgba)` and paints one RGBA frame (`kit/avatars/blob.js` is the reference).

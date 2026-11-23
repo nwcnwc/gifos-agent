@@ -14,7 +14,7 @@ export const DEFAULTS = {
   limits: { replies_per_min: 6, per_person_s: 8, max_reply_chars: 400, max_say_chars: 300, greet_every_s: 12, reply_timeout_s: 25, bot_turns: 2 },
   brain: { provider: 'fixed' },
   voice: { provider: 'none' },
-  avatar: { enabled: false, set: 'blob', fps: 6, width: 160, height: 120 },
+  avatar: { enabled: false, set: 'blob', fps: 6, width: 160, height: 120, blur: 0 },
   greet: { enabled: true, text: 'Hi {names}! I am {name}, a bot. Ask me anything about this meeting.' },
   answer: 'mention',
 };
@@ -57,6 +57,9 @@ export function normalizeConfig(raw, base = process.cwd()) {
   }
   c.limits.max_reply_chars = Math.min(2000, Math.max(40, c.limits.max_reply_chars));
   c.avatar.fps = Math.min(15, Math.max(1, Number(c.avatar.fps) || 6));
+  // the bot's own blur choice, as anyone's camera: 0 No (a drawing shows no one; rooms without a password blur it
+  // anyway), 1 Min, 2 Max
+  c.avatar.blur = [0, 1, 2].includes(Number(c.avatar.blur)) ? Number(c.avatar.blur) : 0;
   c.avatar.width = Math.min(640, Math.max(64, Number(c.avatar.width) || 160));
   c.avatar.height = Math.min(480, Math.max(48, Number(c.avatar.height) || 120));
   // a set is a built-in name or a module path next to the config

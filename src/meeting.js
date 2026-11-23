@@ -132,7 +132,7 @@ export class Meeting {
   }
 
   async _videoOut(o = {}) {
-    const r = await this.call('video.out.open', { width: o.width || 640, height: o.height || 360, fps: o.fps || 15 });
+    const r = await this.call('video.out.open', { width: o.width || 640, height: o.height || 360, fps: o.fps || 15, ...(o.blur === 0 || o.blur === 1 || o.blur === 2 ? { blur: o.blur } : {}) });
     const self = this;
     return {
       id: r.port,
