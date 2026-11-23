@@ -10,7 +10,10 @@
 //     {"id":1,"ok":true,"core":false,"state":{...}}       the answer to a join
 //     {"id":2,"ok":true,"answer":{...}}                   the answer to a call, as the page gave it
 //     {"id":2,"ok":false,"error":"<the page's sentence>"}
-//     {"event":{"type":"line","data":{...}}}              every page event (audio and video frames excepted)
+//     {"event":{"type":"line","data":{...}}}              every page event (video frames excepted; audio.in frames flow
+//                                                         only for a port the caller opened with audio.in.open)
+//   say: {"call":"say","args":{"text":..,"wav":"<base64 WAV>"}} plays the caller's own speech audio; with no wav, this
+//   process voices the text with its own text-to-speech (kokoro-js beside the package), or answers "No voice".
 // Diagnostics go to stderr. The process leaves the meeting when stdin closes.
 import readline from 'node:readline';
 import { join } from './index.js';
@@ -32,14 +35,19 @@ async function handle(m) {
     try {
       meet = await join(String(m.join), { name: o.name, owner: o.owner, notesTo: o.notesTo, password: o.password, core: !!o.core, coreKeys: Array.isArray(o.coreKeys) ? o.coreKeys.map(String) : undefined, relay: o.relay, profile: o.profile, voice: o.core ? false : o.voice, joinMs: o.joinMs, readyMs: o.readyMs });
     } catch (e) { return out({ id: m.id, ok: false, error: String((e && e.message) || e) }); }
-    meet.on('*', (ev) => { if (!/frame$/.test(ev.type)) out({ event: { type: ev.type, data: ev.data === undefined ? null : ev.data } }); });
+    meet.on('*', (ev) => { if (ev.type !== 'video.in.frame') out({ event: { type: ev.type, data: ev.data === undefined ? null : ev.data } }); });
     meet.on('left', () => { leave(0); });
     return out({ id: m.id, ok: true, core: !!meet.core, state: await meet.state().catch(() => null) });
   }
   if (typeof m.call !== 'string') return out({ id: m.id, ok: false, error: 'Send {"join": link} or {"call": name, "args": {...}}.' });
   if (!meet) return out({ id: m.id, ok: false, error: 'Join a meeting first.' });
   if (m.call === 'leave') { await meet.leave().catch(() => {}); out({ id: m.id, ok: true }); return leave(0); }
-  try { out({ id: m.id, ok: true, answer: await meet.call(m.call, m.args || {}) }); }
+  const a = m.args || {};
+  try {
+    // say with no audio: the SDK's own voice makes it (Meeting.say); the caller hears say.done as an event
+    if (m.call === 'say' && !a.wav) return out({ id: m.id, ok: true, answer: await meet.say(String(a.text || ''), { interrupt: a.interrupt, wait: false }) });
+    out({ id: m.id, ok: true, answer: await meet.call(m.call, a) });
+  }
   catch (e) { out({ id: m.id, ok: false, error: String((e && e.message) || e) }); }
 }
 

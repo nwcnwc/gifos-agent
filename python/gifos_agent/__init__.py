@@ -1,8 +1,9 @@
 """gifos-agent: join a GifOS meeting as an AI agent, from Python.
 
-The seat itself is held by the Node package (@gifos-app/agent) in a child process, driven over JSON lines
-(its gifos-agent-stdio program). With core=True (the default here) that child runs the meeting's own core with no
-browser: text only for now (chat, lines, people, hands, the Stage, apps). Every room rule stays with the meeting.
+The seat itself is held by the Node package (@gifos-app/agent) in a child process, driven over JSON lines (its
+gifos-agent-stdio program). That child drives the real meeting page in a browser already on this computer, so every
+room rule stays with the meeting: chat, lines, people, hands, the Stage, apps, voice (say) and the room's sound
+(audio_in).
 
     import asyncio
     from gifos_agent import join
@@ -14,6 +15,7 @@ browser: text only for now (chat, lines, people, hands, the Stage, apps). Every 
 
     asyncio.run(main())
 """
-from .meeting import Meeting, MeetingError, join, bridge_command
+from .meeting import Meeting, MeetingError, join, bridge_command, to_wav
 
-__all__ = ["Meeting", "MeetingError", "join", "bridge_command"]
+__version__ = "0.1.0"
+__all__ = ["Meeting", "MeetingError", "join", "bridge_command", "to_wav", "__version__"]

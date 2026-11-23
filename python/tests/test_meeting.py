@@ -1,68 +1,191 @@
 """The Python seat against a stand-in bridge that speaks gifos-agent-stdio's JSON lines (no meeting, no network).
 Run: python3 -m unittest discover -s python/tests"""
 import asyncio
+import base64
+import io
+import json
 import os
+import struct
 import sys
 import textwrap
 import unittest
+import wave
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from gifos_agent import join, MeetingError  # noqa: E402
+from gifos_agent import join, to_wav, MeetingError, __version__  # noqa: E402
+from gifos_agent.meeting import _line_matches  # noqa: E402
+
+CORE_OFF = "Core mode (joining without a browser) isn't available yet; join without { core: true }."
 
 FAKE = textwrap.dedent(r'''
-    import json, sys
+    import base64, json, struct, sys
+    CORE_OFF = %r
     def out(o): sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()
+    log = []
     for raw in sys.stdin:
         m = json.loads(raw)
+        log.append(m)
         if "join" in m:
+            if m["opts"].get("core"):
+                out({"id": m["id"], "ok": False, "error": CORE_OFF}); continue
             if m["opts"].get("name") == "NoOwner":
                 out({"id": m["id"], "ok": False, "error": "The name must say whose agent it is."}); continue
-            out({"id": m["id"], "ok": True, "core": m["opts"].get("core"), "state": {"joined": True}})
-        elif m.get("call") == "chat":
+            out({"id": m["id"], "ok": True, "core": False, "state": {"joined": True}})
+            continue
+        c, a = m.get("call"), m.get("args") or {}
+        if c == "chat":
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "id": "m_1", "held": False}})
-            out({"event": {"type": "line", "data": {"name": "Ada", "text": "hello", "toMe": False}}})
-            out({"event": {"type": "line", "data": {"name": "Ada", "text": "for you", "toMe": True}}})
-        elif m.get("call") == "people":
+            out({"event": {"type": "line", "data": {"kind": "chat", "name": "Ada", "text": "hello", "toMe": False}}})
+            out({"event": {"type": "line", "data": {"kind": "spoken", "name": "Pyra", "text": "my own words", "mine": True, "toMe": True}}})
+            out({"event": {"type": "line", "data": {"kind": "chat", "name": "Ada", "text": "for you", "toMe": True}}})
+        elif c == "people":
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "people": [{"name": "Ada"}, {"name": "Pyra"}]}})
-        elif m.get("call") == "leave":
+        elif c == "say":
+            # the page's own rule: no WAV, no voice (here the stand-in seat has no text-to-speech of its own)
+            if not a.get("wav"):
+                out({"id": m["id"], "ok": False, "error": "No voice: pass { tts } to join(), or install kokoro-js."}); continue
+            w = base64.b64decode(a["wav"])
+            ok = w[:4] == b"RIFF" and w[8:12] == b"WAVE"
+            # say.done may come before the call's answer (a short clip on a busy page)
+            out({"event": {"type": "say.done", "data": {"id": "say7", "stopped": False}}})
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "id": "say7", "ms": 1000, "wavOk": ok, "text": a.get("text"), "interrupt": a.get("interrupt")}})
+        elif c == "audio.in.open":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "port": "audio.in:3", "rate": a.get("rate"), "who": a.get("who")}})
+            for i in range(3):
+                pcm = struct.pack("<4h", i, i, i, i)
+                out({"event": {"type": "audio.in.frame", "data": {"port": "audio.in:3", "rate": 16000, "ts": i, "pcm": base64.b64encode(pcm).decode()}}})
+        elif c == "audio.in.close":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True}})
+            out({"event": {"type": "port.closed", "data": {"port": a.get("port"), "why": "closed"}}})
+        elif c == "lines":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "lines": [{"kind": "spoken", "text": "Hello", "mine": True}]}})
+        elif c == "echo":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "log": log[:-1]}})
+        elif c == "leave":
             out({"id": m["id"], "ok": True}); out({"event": {"type": "left", "data": {"reason": "leave"}}}); break
         else:
-            out({"id": m["id"], "ok": False, "error": "No such call: " + str(m.get("call"))})
-''')
+            out({"id": m["id"], "ok": False, "error": "No such call: " + str(c)})
+''') % CORE_OFF
+CMD = [sys.executable, "-c", FAKE]
+
+
+def tone(n=480):
+    return [int(8000 * ((i % 20) - 10) / 10) for i in range(n)]
 
 
 class MeetingTest(unittest.TestCase):
     def run_async(self, coro):
         return asyncio.run(coro)
 
+    def test_join_defaults_to_browser_mode(self):
+        async def go():
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            self.assertFalse(meet.core)
+            log = (await meet.call("echo"))["log"]
+            self.assertIs(log[0]["opts"]["core"], False)      # core=False is what goes to the seat
+            self.assertEqual(log[0]["opts"]["owner"], "Sam")
+            await meet.leave()
+        self.run_async(go())
+
+    def test_core_true_raises_the_seats_sentence(self):
+        async def go():
+            with self.assertRaises(MeetingError) as e:
+                await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", core=True, command=CMD)
+            self.assertEqual(str(e.exception), CORE_OFF)
+        self.run_async(go())
+
     def test_join_calls_lines_leave(self):
         async def go():
-            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=[sys.executable, "-c", FAKE])
-            self.assertTrue(meet.core)
-            async def first_to_me():
-                async for line in meet.lines(to_me=True):
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            async def first(it):
+                async for line in it:
                     return line["text"]
-            waiter = asyncio.ensure_future(first_to_me())
-            await asyncio.sleep(0)                      # lines() listens from now on
+            to_me = asyncio.ensure_future(first(meet.lines(to_me=True)))
+            spoken = asyncio.ensure_future(first(meet.lines(kinds=["spoken"])))
             r = await meet.chat("hi")
             self.assertEqual(r["id"], "m_1")            # the page's own id survives (the call id is the envelope's)
-            self.assertEqual(await asyncio.wait_for(waiter, 5), "for you")   # the line not to me was filtered out
+            self.assertEqual(await asyncio.wait_for(to_me, 5), "for you")   # not to me, and its own spoken line, are skipped
+            self.assertFalse(spoken.done())             # its own words never come back, even asked by kind
+            spoken.cancel()
             self.assertEqual([p["name"] for p in await meet.people()], ["Ada", "Pyra"])
+            self.assertEqual((await meet.transcript())[0]["text"], "Hello")
             with self.assertRaises(MeetingError) as e:
                 await meet.call("nope")
             self.assertIn("No such call", str(e.exception))
-            with self.assertRaises(MeetingError):
-                await meet.say("hi")                   # core mode has no voice yet
             await meet.leave()
             self.assertTrue(meet.closed)
+            with self.assertRaises(MeetingError):
+                await meet.chat("after leaving")
         self.run_async(go())
 
     def test_join_refused_raises_the_sentence(self):
         async def go():
             with self.assertRaises(MeetingError) as e:
-                await join("https://example.invalid/meet/x", name="NoOwner", command=[sys.executable, "-c", FAKE])
+                await join("https://example.invalid/meet/x", name="NoOwner", command=CMD)
             self.assertIn("whose agent", str(e.exception))
         self.run_async(go())
+
+    def test_say_with_python_tts_waits_for_say_done(self):
+        async def go():
+            async def tts(text):                       # async tts returning (pcm, rate)
+                return tone(), 24000
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD, tts=tts)
+            r = await asyncio.wait_for(meet.say("Hello there", interrupt="never"), 5)
+            self.assertEqual(r["id"], "say7")
+            self.assertIs(r["stopped"], False)         # say.done reached it though it came before the answer
+            self.assertTrue(r["wavOk"])
+            self.assertEqual((r["text"], r["interrupt"]), ("Hello there", "never"))
+            await meet.leave()
+        self.run_async(go())
+
+    def test_say_without_a_voice_raises_the_sentence(self):
+        async def go():
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            with self.assertRaises(MeetingError) as e:
+                await meet.say("hi")
+            self.assertIn("No voice", str(e.exception))
+            await meet.leave()
+        self.run_async(go())
+
+    def test_audio_in_frames_then_close(self):
+        async def go():
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            ear = await meet.audio_in(rate=16000)
+            self.assertEqual(ear.info["who"], "room")
+            got = []
+            async for f in ear:
+                got.append(struct.unpack("<4h", f["pcm"])[0])
+                if len(got) == 3:
+                    break
+            self.assertEqual(got, [0, 1, 2])
+            await ear.close()
+            self.assertEqual(meet._ports, {})
+            await meet.leave()
+        self.run_async(go())
+
+    def test_to_wav(self):
+        w = to_wav(tone(), 16000)
+        with wave.open(io.BytesIO(w)) as r:
+            self.assertEqual((r.getnchannels(), r.getsampwidth(), r.getframerate(), r.getnframes()), (1, 2, 16000, 480))
+        self.assertEqual(to_wav(struct.pack("<2h", 1, -1), 8000)[-4:], struct.pack("<2h", 1, -1))
+
+    def test_line_filter_matches_the_node_rules(self):
+        chat = {"kind": "chat", "text": "x"}
+        self.assertTrue(_line_matches(chat))
+        self.assertFalse(_line_matches(dict(chat, final=False)))
+        self.assertFalse(_line_matches({"kind": "spoken"}))
+        self.assertTrue(_line_matches({"kind": "spoken"}, kinds=["spoken"]))
+        self.assertFalse(_line_matches(dict(chat, mine=True)))
+        self.assertFalse(_line_matches(chat, to_me=True))
+        self.assertFalse(_line_matches(chat, from_admin=True))
+        self.assertTrue(_line_matches(chat, trusted=True))                 # chat needs no caption trust
+        self.assertFalse(_line_matches({"kind": "caption", "trust": "unchecked"}, trusted=True))
+        self.assertTrue(_line_matches({"kind": "caption", "trust": "own"}, trusted=True))
+
+    def test_version_matches_pyproject(self):
+        here = os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")
+        with open(here) as f:
+            self.assertIn('version = "%s"' % __version__, f.read())
 
 
 if __name__ == "__main__":

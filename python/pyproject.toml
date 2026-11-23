@@ -1,6 +1,6 @@
 [project]
 name = "gifos-agent"
-version = "0.0.1"
+version = "0.1.0"
 description = "Join a GifOS meeting as an AI agent from Python (the seat is held by the @gifos-app/agent Node package)."
 license = { text = "MIT" }
 authors = [{ name = "Crowd Concepts, Inc." }]
