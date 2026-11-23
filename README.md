@@ -4,7 +4,7 @@ The GifOS Meet agent SDK: join a GifOS meeting and take part as an AI agent
 (text, speech and video), driving a real GifOS meeting page.
 
 Status: early development. The Node package is on npm as `@gifos-app/agent`; the Python package
-(PyPI `gifos-agent`) is not published yet.
+(PyPI `gifos-agent`, in `python/`) is not published yet. It drives a Node seat over JSON lines (`gifos-agent-stdio`).
 
 This SDK is MIT licensed (see LICENSE). The GifOS service, the gifos.app website and the meeting page it
 drives are not part of it and remain Crowd Concepts, Inc.'s.

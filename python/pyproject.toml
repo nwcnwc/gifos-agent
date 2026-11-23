@@ -1,0 +1,15 @@
+[project]
+name = "gifos-agent"
+version = "0.0.1"
+description = "Join a GifOS meeting as an AI agent from Python (the seat is held by the @gifos-app/agent Node package)."
+license = { text = "MIT" }
+authors = [{ name = "Crowd Concepts, Inc." }]
+requires-python = ">=3.9"
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://gifos.app"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

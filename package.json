@@ -15,7 +15,8 @@
     ".": "./src/index.js"
   },
   "bin": {
-    "gifos-agent-bridge": "examples/shell-bridge.mjs"
+    "gifos-agent-bridge": "examples/shell-bridge.mjs",
+    "gifos-agent-stdio": "src/stdio.js"
   },
   "files": [
     "src",
