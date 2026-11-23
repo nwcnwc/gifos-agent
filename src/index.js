@@ -10,9 +10,10 @@ import { playwrightTransport } from './transport-playwright.js';
 import { coreTransport } from './transport-core.js';
 import { GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore } from './core-trust.js';
 import { kokoroTts } from './tts.js';
+import { CORE_MODE, CORE_MODE_OFF } from './flags.js';
 import { toWav, toPcm16 } from './audio.js';
 
-export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore };
+export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE };
 
 // The page address in agent mode. A hash that already carries meeting fields (#v=room) gets agent=1 too.
 export function agentUrl(link) {
@@ -54,7 +55,9 @@ function seated(meet, ms) {
 // core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
 // from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over
 // real WebRTC data channels. Text only for now (chat, lines, people, hands, stage, apps); no voice or video yet.
+// Off for now (src/flags.js): core: true is refused with a sentence.
 export async function join(url, opts = {}) {
+  if (opts.core && !CORE_MODE) throw new Error(CORE_MODE_OFF);
   const name = agentName(opts.name, opts.owner);
   // The agent's own profile keeps its person key, so it is the same person across joins.
   const profile = opts.profile || path.join(os.homedir(), '.gifos-agent', slug(name) + '-' + crypto.createHash('sha256').update(name).digest('hex').slice(0, 6));

@@ -7,6 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { coreTransport, Meeting } from '../../src/index.js';
 import { signSite, testKey } from './signed-site.js';
+import { CORE_MODE } from '../../src/flags.js';
+
+// Core mode is switched off in src/flags.js for now. These tests are kept for when it is on: they are skipped while
+// CORE_MODE is false and run again by themselves when it is set to true.
+const gate = { skip: !CORE_MODE && 'core mode is off (src/flags.js CORE_MODE)' };
 
 const fakeFetch = (files) => async (url) => {
   const p = new URL(url).pathname;
@@ -41,7 +46,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gifos-core-trust-'));
 const marks = (dir) => fs.readdirSync(dir).filter((f) => f.startsWith('via-'));
 const NAME = 'Ada (Sam’s assistant)';
 
-test('a hostile unsigned site is refused before any of it runs', async () => {
+test('a hostile unsigned site is refused before any of it runs', gate, async () => {
   const dir = tmp();
   const fetch = fakeFetch({ '/js/core/node.js': hostile(dir), '/js/core/files.json': '{"core":[]}' });
   await assert.rejects(coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch }), /not signed by GifOS/);
@@ -49,7 +54,7 @@ test('a hostile unsigned site is refused before any of it runs', async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a site signed by a key that is not GifOS\'s is refused (the pinned key, and a key the operator trusts)', async () => {
+test('a site signed by a key that is not GifOS\'s is refused (the pinned key, and a key the operator trusts)', gate, async () => {
   const dir = tmp();
   const files = signSite({ 'js/core/node.js': hostile(dir), 'js/core/files.json': '{"core":[]}' }, testKey());
   await assert.rejects(coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files) }), /not signed by GifOS/);
@@ -58,7 +63,7 @@ test('a site signed by a key that is not GifOS\'s is refused (the pinned key, an
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a changed file, a tampered list, an unlisted file and an old build are refused', async () => {
+test('a changed file, a tampered list, an unlisted file and an old build are refused', gate, async () => {
   const dir = tmp(), K = testKey();
   const base = { 'js/core/node.js': hostile(dir), 'js/core/files.json': '{"core":[]}' };
   const tr = (files) => coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [K.pub] });
@@ -72,7 +77,7 @@ test('a changed file, a tampered list, an unlisted file and an old build are ref
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a signed core runs in a child that cannot write files, start programs, see the environment or write our stdout', async () => {
+test('a signed core runs in a child that cannot write files, start programs, see the environment or write our stdout', gate, async () => {
   const dir = tmp(), K = testKey();
   process.env.GIFOS_TEST_SECRET = 'sk-not-for-the-core';
   const logs = [];

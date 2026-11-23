@@ -3,11 +3,11 @@
 // (the Python package) takes part: this process holds the seat, the caller sends calls and reads answers and events.
 //
 //   in  (one JSON object per line):
-//     {"id":1,"join":"<meeting link>","opts":{"name":"Ada (Sam's assistant)","core":true,"password":"..."}}   first
+//     {"id":1,"join":"<meeting link>","opts":{"name":"Ada (Sam's assistant)","password":"..."}}   first
 //     {"id":2,"call":"chat","args":{"text":"hello"}}      any call of the page's gifosAgent contract
 //     {"id":3,"call":"leave"}                             leaves, answers, then this process exits
 //   out (one JSON object per line):
-//     {"id":1,"ok":true,"core":true,"state":{...}}        the answer to a join
+//     {"id":1,"ok":true,"core":false,"state":{...}}       the answer to a join
 //     {"id":2,"ok":true,"answer":{...}}                   the answer to a call, as the page gave it
 //     {"id":2,"ok":false,"error":"<the page's sentence>"}
 //     {"event":{"type":"line","data":{...}}}              every page event (audio and video frames excepted)

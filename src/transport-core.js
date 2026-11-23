@@ -18,6 +18,7 @@ import { fork } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { fetchSignedCore } from './core-trust.js';
+import { CORE_MODE, CORE_MODE_OFF } from './flags.js';
 
 const require = createRequire(import.meta.url);
 const CHILD = fileURLToPath(new URL('./core-child.cjs', import.meta.url));
@@ -59,6 +60,7 @@ function profileStore(dir) {
 // coreKeys: public keys (base64) to trust in place of GifOS's pinned key, for a core you built and signed yourself.
 // It is the operator's choice, never something a meeting link can set.
 export async function coreTransport(url, cfg = {}) {
+  if (!CORE_MODE) throw new Error(CORE_MODE_OFF);   // src/flags.js
   if (+process.versions.node.split('.')[0] < 22) throw new Error('Joining with { core: true } needs Node 22 or later (this is Node ' + process.versions.node + ').');
   const origin = new URL(url).origin;
   const core = await fetchSignedCore(origin, { fetch: cfg.fetch, keys: cfg.coreKeys });

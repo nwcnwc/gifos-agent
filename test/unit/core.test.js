@@ -6,6 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { coreTransport, Meeting } from '../../src/index.js';
 import { signSite, testKey } from './signed-site.js';
+import { CORE_MODE } from '../../src/flags.js';
+
+// Core mode is switched off in src/flags.js for now. These tests are kept for when it is on: they are skipped while
+// CORE_MODE is false and run again by themselves when it is set to true.
+const gate = { skip: !CORE_MODE && 'core mode is off (src/flags.js CORE_MODE)' };
 
 // A stand-in for the site's Node host: one participant whose agent answers state/chat and emits events.
 const HOST = `
@@ -40,7 +45,7 @@ function fakeFetch(files) {
 }
 const KEY = testKey();
 
-test('core transport: host from the site, contract carried, profile kept', async () => {
+test('core transport: host from the site, contract carried, profile kept', gate, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gifos-agent-core-'));
   const fetch = fakeFetch(signSite({ 'js/core/node.js': HOST, 'js/core/files.json': '{"core":[]}' }, KEY));
   const t = await coreTransport('https://example.test/run.html#v=abc&agent=1', { name: 'Ada (Sam’s assistant)', profile: dir, fetch, coreKeys: [KEY.pub], noWebrtc: true });
@@ -58,7 +63,7 @@ test('core transport: host from the site, contract carried, profile kept', async
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('core transport: a site without the core says so', async () => {
+test('core transport: a site without the core says so', gate, async () => {
   const fetch = fakeFetch({});
   await assert.rejects(coreTransport('https://old.example.test/meet/abc', { name: 'A (B’s assistant)', fetch, coreKeys: [KEY.pub] }), /no GifOS core for agents/);
 });
