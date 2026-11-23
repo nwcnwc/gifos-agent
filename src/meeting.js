@@ -92,7 +92,7 @@ export class Meeting {
   // the text, not from speech). A tts function {(text) -> {wav}|{pcm, rate}} or Kokoro makes the voice.
   async say(text, opts = {}) {
     const tts = this.opts.tts;
-    if (!tts) throw new Error(this.core ? 'This agent joined with { core: true }, which has no voice yet: use chat().' : 'No voice: pass { tts } to join(), or install kokoro-js.');
+    if (!tts) throw new Error('No voice: pass { tts } to join(), or install kokoro-js.');
     const v = await tts(String(text), opts);
     const wav = v.wav ? v.wav : toWav(v.pcm, v.rate);
     // Listen before calling: a busy page can finish a short clip before its answer to the call reaches us.

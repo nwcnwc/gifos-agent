@@ -9,9 +9,10 @@
 //   2. it runs in a child process under Node's permission model (no file writes, no child processes, no workers, no
 //      addons, file reads of this package's dependency folder only), with an empty environment and no access to this
 //      process's stdin or stdout. The agent's profile is written here, from the child's storage changes.
-// Peer links use real WebRTC data channels (werift, loaded in the child). Data only for now: chat, lines, people,
-// hands, stage, apps and the rest of the contract; say() and the audio and video ports answer that this seat has no
-// media.
+// Peer links use real WebRTC (werift, loaded in the child): data channels for chat, lines, people, hands, stage, apps
+// and the rest of the contract, and media through the core's Node media plane (the site's js/core/media/plane-node.js):
+// say() and audio.out speak on the seat's voice track, audio.in hears the room, encoded with Opus by the opusscript
+// package (WebAssembly, so the child still loads no native addon).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fork } from 'node:child_process';
@@ -29,6 +30,15 @@ function werift() {
   let d = path.dirname(main);
   while (path.basename(d) !== 'node_modules' && path.dirname(d) !== d) d = path.dirname(d);
   if (path.basename(d) !== 'node_modules') throw new Error('Core mode needs the werift package in a node_modules folder.');
+  return { main, root: d };
+}
+
+// The Opus codec the child's media plane encodes and decodes with (WebAssembly): its file and its node_modules root.
+function opus() {
+  let main; try { main = fs.realpathSync(require.resolve('opusscript')); } catch (e) { throw new Error('Core mode needs the opusscript package (npm install opusscript).'); }
+  let d = path.dirname(main);
+  while (path.basename(d) !== 'node_modules' && path.dirname(d) !== d) d = path.dirname(d);
+  if (path.basename(d) !== 'node_modules') throw new Error('Core mode needs the opusscript package in a node_modules folder.');
   return { main, root: d };
 }
 
@@ -72,8 +82,9 @@ export async function coreTransport(url, cfg = {}) {
   const session = cfg.name ? { gifos_appear_ok: '1' } : {};
 
   const wr = cfg.noWebrtc ? null : werift();
+  const op = wr ? opus() : null;   // media rides the peer links: no WebRTC, no media
   const child = fork(CHILD, [], {
-    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], ['--max-old-space-size=1024']),
+    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], op && (!wr || op.root !== wr.root) ? ['--allow-fs-read=' + op.root] : [], ['--max-old-space-size=1024']),
     env: {}, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'json',
   });
   const childLog = (d) => { if (cfg.log) cfg.log('child', String(d).slice(0, 4000)); };
@@ -100,7 +111,7 @@ export async function coreTransport(url, cfg = {}) {
     settleAll('The meeting core stopped.');
     if (!closed) { closed = true; push({ type: 'left', data: { reason: 'manual', why: failed ? 'core-failed' : 'core-exited' } }); }
   });
-  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null } });
+  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null } });
 
   return {
     kind: 'core',
