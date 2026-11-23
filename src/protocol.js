@@ -13,7 +13,7 @@ export const EVENTS = [
 
 // Actions, agent -> page. Each answers {ok:true, ...} or {ok:false, error:'<a sentence a person can read>'}.
 export const ACTIONS = [
-  'state', 'people', 'lines',
+  'state', 'people', 'lines', 'rights', 'credentials',
   'say', 'say.stop', 'chat', 'hand', 'mic', 'stage.ask', 'stage.leave',
   'app.run', 'app.stop', 'app.room', 'app.data', 'agenda.next', 'agenda.set', 'profile', 'leave',
   'audio.out.open', 'audio.out.write', 'audio.out.clear', 'audio.out.close',

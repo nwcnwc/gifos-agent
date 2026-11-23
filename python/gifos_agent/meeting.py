@@ -260,6 +260,18 @@ class Meeting:
     async def state(self):
         return (await self.call("state")).get("state")
 
+    async def rights(self):
+        """What this seat may do: the signed line items it holds now (signed, label, roomLimit, admitAtFullDoor,
+        captureOpenRoom, turnVideoLinks, storage, meetings, agentHost, overflow, until, sources). label is display
+        only: decide on the line items. No plan held: the defaults, signed False."""
+        return (await self.call("rights")).get("rights")
+
+    async def use_credentials(self, file):
+        """Use a credentials GIF (a subscription file or a pass) in this seat: a path or the bytes. -> the rights it holds."""
+        import base64
+        data = open(file, "rb").read() if isinstance(file, str) else bytes(file)
+        return (await self.call("credentials", {"gif_b64": base64.b64encode(data).decode("ascii")})).get("rights")
+
     async def chat(self, text):
         return await self.call("chat", {"text": str(text)})
 

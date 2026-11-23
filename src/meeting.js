@@ -113,6 +113,16 @@ export class Meeting {
     });
   }
   stopSaying() { return this.call('say.stop'); }
+  // What this seat may do: the signed line items it holds now ({signed, label, roomLimit, admitAtFullDoor, captureOpenRoom,
+  // turnVideoLinks, storage, meetings, agentHost, overflow, until, sources}). label is the plan's name, for display only:
+  // decide on the line items. No plan held: the defaults, signed false.
+  async rights() { return (await this.call('rights')).rights || null; }
+  // Use a credentials GIF (a subscription file from Settings > Subscription, or a pass) in this seat: a path or the bytes.
+  // Its bytes go only to this seat's page. -> the rights it now holds.
+  async useCredentials(file) {
+    const bytes = typeof file === 'string' ? (await import('node:fs/promises')).readFile(file) : file;
+    return (await this.call('credentials', { gif_b64: b64(await bytes) })).rights || null;
+  }
   chat(text) { return this.call('chat', { text }); }
   hand(up = true) { return this.call('hand', { up: !!up }); }
   mic(on) { return this.call('mic', { on: !!on }); }
