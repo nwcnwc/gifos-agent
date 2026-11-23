@@ -33,13 +33,12 @@ function werift() {
   return { main, root: d };
 }
 
-// The Opus codec the child's media plane encodes and decodes with (WebAssembly): its file and its node_modules root.
+// The Opus codec the child's media plane encodes and decodes with (WebAssembly): its file and its own package folder
+// (opusscript has no dependencies, so the child may read that folder and nothing beside it).
 function opus() {
-  let main; try { main = fs.realpathSync(require.resolve('opusscript')); } catch (e) { throw new Error('Core mode needs the opusscript package (npm install opusscript).'); }
-  let d = path.dirname(main);
-  while (path.basename(d) !== 'node_modules' && path.dirname(d) !== d) d = path.dirname(d);
-  if (path.basename(d) !== 'node_modules') throw new Error('Core mode needs the opusscript package in a node_modules folder.');
-  return { main, root: d };
+  let pkg; try { pkg = fs.realpathSync(require.resolve('opusscript/package.json')); } catch (e) { throw new Error('Core mode needs the opusscript package (npm install opusscript).'); }
+  const root = path.dirname(pkg);
+  return { main: fs.realpathSync(require.resolve('opusscript')), root };
 }
 
 // The agent's localStorage, kept in its profile folder: its person key lives there, so it is the same person across joins.
@@ -84,7 +83,7 @@ export async function coreTransport(url, cfg = {}) {
   const wr = cfg.noWebrtc ? null : werift();
   const op = wr ? opus() : null;   // media rides the peer links: no WebRTC, no media
   const child = fork(CHILD, [], {
-    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], op && (!wr || op.root !== wr.root) ? ['--allow-fs-read=' + op.root] : [], ['--max-old-space-size=1024']),
+    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], op && !(wr && op.root.startsWith(wr.root + path.sep)) ? ['--allow-fs-read=' + op.root] : [], ['--max-old-space-size=1024']),
     env: {}, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'json',
   });
   const childLog = (d) => { if (cfg.log) cfg.log('child', String(d).slice(0, 4000)); };
