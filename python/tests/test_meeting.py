@@ -59,6 +59,11 @@ FAKE = textwrap.dedent(r'''
             out({"event": {"type": "port.closed", "data": {"port": a.get("port"), "why": "closed"}}})
         elif c == "lines":
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "lines": [{"kind": "spoken", "text": "Hello", "mine": True}]}})
+        elif c == "rights":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "rights": {"signed": True, "meetings": 3, "agentHost": 0, "label": "room20"}}})
+        elif c == "credentials":
+            raw = base64.b64decode(a.get("gif_b64") or "")
+            out({"id": m["id"], "ok": True, "answer": {"ok": True, "rights": {"signed": True, "meetings": 1, "bytes": raw.decode("ascii")}}})
         elif c == "echo":
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "log": log[:-1]}})
         elif c == "leave":
@@ -197,6 +202,32 @@ class MeetingTest(unittest.TestCase):
         self.assertTrue(_line_matches(chat, trusted=True))                 # chat needs no caption trust
         self.assertFalse(_line_matches({"kind": "caption", "trust": "unchecked"}, trusted=True))
         self.assertTrue(_line_matches({"kind": "caption", "trust": "own"}, trusted=True))
+
+    def test_rights_and_use_credentials(self):
+        async def go():
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            held = await meet.rights()
+            self.assertEqual(held["signed"], True)
+            self.assertEqual(held["meetings"], 3)
+            self.assertEqual(held["agentHost"], 0)
+            blob = b"GIF89a-bytes"
+            got = await meet.use_credentials(blob)
+            self.assertEqual(got["bytes"], "GIF89a-bytes")
+            cred_path = "/tmp/planrights28-py-cred.gif"
+            with open(cred_path, "wb") as f:
+                f.write(b"from-path")
+            try:
+                got2 = await meet.use_credentials(cred_path)
+                self.assertEqual(got2["bytes"], "from-path")
+            finally:
+                os.remove(cred_path)
+            log = (await meet.call("echo"))["log"]
+            calls = [m for m in log if m.get("call") in ("rights", "credentials")]
+            self.assertEqual([m["call"] for m in calls], ["rights", "credentials", "credentials"])
+            self.assertEqual(calls[1]["args"]["gif_b64"], base64.b64encode(blob).decode("ascii"))
+            self.assertEqual(calls[2]["args"]["gif_b64"], base64.b64encode(b"from-path").decode("ascii"))
+            await meet.leave()
+        self.run_async(go())
 
     def test_version_matches_pyproject(self):
         here = os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")

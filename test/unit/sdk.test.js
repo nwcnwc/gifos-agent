@@ -1,7 +1,8 @@
 // The SDK over a fake transport: it only carries the page's contract.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Meeting, agentName, lineMatches, agentUrl, roomOf, toWav } from '../../src/index.js';
+import fs from 'node:fs/promises';
+import { Meeting, ACTIONS, agentName, lineMatches, agentUrl, roomOf, toWav } from '../../src/index.js';
 import { candidates } from '../../src/browser.js';
 
 function fakeTransport(answers = {}) {
@@ -137,4 +138,39 @@ test('join() drives a Playwright chromium the caller hands it', async () => {
   await assert.rejects(join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)", chromium, profile: '/nonexistent/agent-profile' }), /Chrome or Edge|GIFOS_CHROME/);
   assert.ok(seen.length >= 1, 'the given chromium was asked to launch');
   assert.equal(seen[0].dir, '/nonexistent/agent-profile');
+});
+
+test('ACTIONS include rights and credentials', () => {
+  assert.ok(ACTIONS.includes('rights'));
+  assert.ok(ACTIONS.includes('credentials'));
+});
+
+test('rights() calls action rights and returns .rights', async () => {
+  const held = { signed: true, meetings: 3, agentHost: 0, label: 'room20' };
+  const t = fakeTransport({ rights: { ok: true, rights: held } });
+  const meet = new Meeting(t);
+  assert.deepEqual(await meet.rights(), held);
+  assert.deepEqual(t.calls[0], ['rights', {}]);
+});
+
+test('useCredentials(bytes) sends base64 under gif_b64; useCredentials(path) reads the file', async () => {
+  const held = { signed: true, meetings: 1 };
+  const bytes = Buffer.from('GIF89a-bytes');
+  const t = fakeTransport({ credentials: (a) => ({ ok: true, rights: Object.assign({ gif_b64: a.gif_b64 }, held) }) });
+  const meet = new Meeting(t);
+  const got = await meet.useCredentials(bytes);
+  assert.equal(got.signed, true);
+  assert.equal(got.meetings, 1);
+  assert.equal(t.calls[0][0], 'credentials');
+  assert.equal(t.calls[0][1].gif_b64, bytes.toString('base64'));
+  const credPath = '/tmp/planrights28-node-cred.gif';
+  await fs.writeFile(credPath, Buffer.from('from-path'));
+  try {
+    const t2 = fakeTransport({ credentials: (a) => ({ ok: true, rights: { signed: true, gif_b64: a.gif_b64 } }) });
+    const r = await new Meeting(t2).useCredentials(credPath);
+    assert.equal(r.gif_b64, Buffer.from('from-path').toString('base64'));
+    assert.equal(t2.calls[0][0], 'credentials');
+  } finally {
+    await fs.unlink(credPath);
+  }
 });
