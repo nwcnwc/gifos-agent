@@ -123,8 +123,10 @@ class _App:
 class Meeting:
     """One agent seat. Every method is one call of the meeting page's gifosAgent contract."""
 
-    def __init__(self, proc, tts=None):
+    def __init__(self, proc, tts=None, cmd=()):
         self._proc = proc
+        self._cmd = list(cmd)
+        self.joined = False
         self._tts = tts
         self._next = 0
         self._waiting = {}
@@ -154,7 +156,7 @@ class Meeting:
                 if fut and not fut.done():
                     fut.set_result(m)
         finally:
-            self._finish()
+            self._finish(self._seat_gone())
 
     def _event(self, ev):
         t, d = ev.get("type"), ev.get("data")
@@ -184,7 +186,14 @@ class Meeting:
         if t == "left":
             self._finish()
 
-    def _finish(self):
+    def _seat_gone(self):
+        if self.joined:
+            return "The meeting seat closed."
+        return ("The GifOS agent seat (" + " ".join(self._cmd) + ") stopped before joining. It needs Node 22 or later and "
+                "the @gifos-app/agent package (npm install -g @gifos-app/agent, or GIFOS_AGENT_BRIDGE set to its src/stdio.js); "
+                "its own error is printed above.")
+
+    def _finish(self, why="The meeting seat closed."):
         if self.closed:
             return
         self.closed = True
@@ -195,7 +204,7 @@ class Meeting:
         self._ports.clear()
         for fut in self._waiting.values():
             if not fut.done():
-                fut.set_exception(MeetingError("The meeting seat closed."))
+                fut.set_exception(MeetingError(why))
         self._waiting.clear()
 
     async def _send(self, msg):
@@ -205,8 +214,12 @@ class Meeting:
         msg["id"] = self._next
         fut = asyncio.get_running_loop().create_future()
         self._waiting[self._next] = fut
-        self._proc.stdin.write((json.dumps(msg) + "\n").encode())
-        await self._proc.stdin.drain()
+        try:
+            self._proc.stdin.write((json.dumps(msg) + "\n").encode())
+            await self._proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            self._waiting.pop(self._next, None)
+            raise MeetingError(self._seat_gone()) from None
         r = await fut
         if not r.get("ok"):
             raise MeetingError(r.get("error") or "The meeting page did not answer.")
@@ -342,9 +355,15 @@ async def join(url, name=None, owner=None, core=False, password=None, relay=None
     voice of say(); without it the Node seat's own voice (kokoro-js) is used; voice=False turns that off.
     core=True (joining with no browser) is not available yet: the seat refuses it with a sentence, raised as
     MeetingError. core_keys: public keys (base64) to trust for a core you signed yourself, once core mode ships."""
-    proc = await asyncio.create_subprocess_exec(*(command or bridge_command()), stdin=asyncio.subprocess.PIPE,
-                                                stdout=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024)
-    meet = Meeting(proc, tts=tts)
+    cmd = list(command or bridge_command())
+    try:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdin=asyncio.subprocess.PIPE,
+                                                    stdout=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024)
+    except OSError as e:
+        raise MeetingError("Could not start the GifOS agent seat (" + " ".join(cmd) + "): " + str(e) + ". It needs Node 22 "
+                           "or later and the @gifos-app/agent package: npm install -g @gifos-app/agent (or set "
+                           "GIFOS_AGENT_BRIDGE to its src/stdio.js).") from None
+    meet = Meeting(proc, tts=tts, cmd=cmd)
     opts = {"name": name, "owner": owner, "core": bool(core), "password": password, "relay": relay, "profile": profile, "joinMs": join_ms, "coreKeys": list(core_keys) if core_keys else None, "voice": voice}
     try:
         r = await meet._send({"join": url, "opts": {k: v for k, v in opts.items() if v is not None}})
@@ -355,4 +374,5 @@ async def join(url, name=None, owner=None, core=False, password=None, relay=None
         await proc.wait()
         raise
     meet.core = bool(r.get("core"))
+    meet.joined = True
     return meet

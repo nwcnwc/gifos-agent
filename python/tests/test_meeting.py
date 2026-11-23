@@ -125,6 +125,22 @@ class MeetingTest(unittest.TestCase):
             self.assertIn("whose agent", str(e.exception))
         self.run_async(go())
 
+    def test_no_seat_program_says_what_is_needed(self):
+        async def go():
+            with self.assertRaises(MeetingError) as e:
+                await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=["/nonexistent/gifos-agent-stdio"])
+            self.assertIn("Node 22", str(e.exception))
+            self.assertIn("npm install -g @gifos-app/agent", str(e.exception))
+        self.run_async(go())
+
+    def test_seat_that_dies_before_joining_says_what_is_needed(self):
+        async def go():
+            with self.assertRaises(MeetingError) as e:
+                await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=[sys.executable, "-c", "import sys; sys.exit(3)"])
+            self.assertIn("stopped before joining", str(e.exception))
+            self.assertIn("@gifos-app/agent", str(e.exception))
+        self.run_async(go())
+
     def test_say_with_python_tts_waits_for_say_done(self):
         async def go():
             async def tts(text):                       # async tts returning (pcm, rate)
