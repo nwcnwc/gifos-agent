@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { coreTransport, Meeting } from '../../src/index.js';
+import { signSite, testKey } from './signed-site.js';
 
 // A stand-in for the site's Node host: one participant whose agent answers state/chat and emits events.
 const HOST = `
@@ -33,15 +34,16 @@ module.exports = {
 function fakeFetch(files) {
   return async (url) => {
     const p = new URL(url).pathname;
-    if (!(p in files)) return { ok: false, status: 404, text: async () => '', json: async () => null };
-    return { ok: true, status: 200, text: async () => files[p], json: async () => JSON.parse(files[p]) };
+    if (!(p in files)) return { ok: false, status: 404, text: async () => '', arrayBuffer: async () => new ArrayBuffer(0) };
+    return { ok: true, status: 200, text: async () => files[p], arrayBuffer: async () => new TextEncoder().encode(files[p]).buffer };
   };
 }
+const KEY = testKey();
 
 test('core transport: host from the site, contract carried, profile kept', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gifos-agent-core-'));
-  const fetch = fakeFetch({ '/js/core/node.js': HOST, '/js/core/files.json': '{"core":[]}' });
-  const t = await coreTransport('https://example.test/run.html#v=abc&agent=1', { name: 'Ada (Sam’s assistant)', profile: dir, fetch, webrtc: {} });
+  const fetch = fakeFetch(signSite({ 'js/core/node.js': HOST, 'js/core/files.json': '{"core":[]}' }, KEY));
+  const t = await coreTransport('https://example.test/run.html#v=abc&agent=1', { name: 'Ada (Sam’s assistant)', profile: dir, fetch, coreKeys: [KEY.pub], noWebrtc: true });
   const meet = new Meeting(t);
   await t.ready(1000);
   assert.equal((await meet.state()).me.name, 'Ada (Sam’s assistant)');
@@ -58,5 +60,5 @@ test('core transport: host from the site, contract carried, profile kept', async
 
 test('core transport: a site without the core says so', async () => {
   const fetch = fakeFetch({});
-  await assert.rejects(coreTransport('https://old.example.test/meet/abc', { name: 'A (B’s assistant)', fetch, webrtc: {} }), /no GifOS core for agents/);
+  await assert.rejects(coreTransport('https://old.example.test/meet/abc', { name: 'A (B’s assistant)', fetch, coreKeys: [KEY.pub] }), /no GifOS core for agents/);
 });

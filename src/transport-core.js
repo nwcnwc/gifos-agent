@@ -1,43 +1,38 @@
 // The core transport: the meeting with no browser. It carries the same gifosAgent contract as the Playwright
-// transport, from a meeting participant running in this Node process.
+// transport, from a meeting participant running in a process of its own (docs/core-trust.md).
 //
 // The GifOS core (the meeting's logic: relay protocol, proof of work, keys, mesh, room rules, the agent contract) is
-// not part of this package. It is loaded from the meeting's own site, the way a browser loads the meeting page:
-// <origin>/js/core/node.js (the Node host) and the core scripts it lists. So the agent always runs the build the
-// meeting runs, and the page keeps every room rule. Peer links use real WebRTC data channels (werift).
-//
-// Data only for now: chat, lines, people, hands, stage, apps and the rest of the contract; say() and the audio and
-// video ports answer that this seat has no media.
+// not part of this package. It is loaded from the meeting's own site, the way a browser loads the meeting page, so the
+// agent runs the build the meeting runs. A meeting link is untrusted, so:
+//   1. only a core SIGNED by GifOS runs: the signed file list (js/core/core.sig.json) is checked against the key
+//      pinned in core-trust.js, and every file against its hash, before anything runs;
+//   2. it runs in a child process under Node's permission model (no file writes, no child processes, no workers, no
+//      addons, file reads of this package's dependency folder only), with an empty environment and no access to this
+//      process's stdin or stdout. The agent's profile is written here, from the child's storage changes.
+// Peer links use real WebRTC data channels (werift, loaded in the child). Data only for now: chat, lines, people,
+// hands, stage, apps and the rest of the contract; say() and the audio and video ports answer that this seat has no
+// media.
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
-import { createRequire, builtinModules } from 'node:module';
+import { fork } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { fetchSignedCore } from './core-trust.js';
 
 const require = createRequire(import.meta.url);
-const hosts = new Map();
+const CHILD = fileURLToPath(new URL('./core-child.cjs', import.meta.url));
 
-// The site's Node host as a module. It may load Node's built-in modules only.
-async function loadHost(origin, fetchFn) {
-  if (hosts.has(origin)) return hosts.get(origin);
-  const at = new URL('/js/core/node.js', origin).href;
-  const r = await fetchFn(at, { cache: 'no-store' });
-  if (!r.ok) throw new Error('This site has no GifOS core for agents (' + at + ' answered ' + r.status + '). Join without { core: true }.');
-  const text = await r.text();
-  const mod = { exports: {} };
-  const builtinOnly = (id) => {
-    const m = String(id).replace(/^node:/, '');
-    if (builtinModules.includes(m)) return require(m);
-    throw new Error('The GifOS core host may load Node built-in modules only, not ' + id + '.');
-  };
-  vm.runInThisContext('(function (exports, require, module, __filename, __dirname) {' + text + '\n})', { filename: at })(mod.exports, builtinOnly, mod, at, undefined);
-  const host = mod.exports;
-  const site = await host.loadSite(origin, { fetch: fetchFn });
-  const h = { host, site };
-  hosts.set(origin, h);
-  return h;
+// The folder the child may read: the node_modules root werift resolves from (its dependencies sit beside it).
+function werift() {
+  let main; try { main = fs.realpathSync(require.resolve('werift')); } catch (e) { throw new Error('Core mode needs the werift package (npm install werift).'); }
+  let d = path.dirname(main);
+  while (path.basename(d) !== 'node_modules' && path.dirname(d) !== d) d = path.dirname(d);
+  if (path.basename(d) !== 'node_modules') throw new Error('Core mode needs the werift package in a node_modules folder.');
+  return { main, root: d };
 }
 
 // The agent's localStorage, kept in its profile folder: its person key lives there, so it is the same person across joins.
+const MAX_KEYS = 512, MAX_VALUE = 256 * 1024;
 function profileStore(dir) {
   const file = dir ? path.join(dir, 'core-storage.json') : null;
   let data = {};
@@ -45,74 +40,93 @@ function profileStore(dir) {
   let timer = null;
   const save = () => { timer = null; if (!file) return; try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file + '.tmp', JSON.stringify(data)); fs.renameSync(file + '.tmp', file); } catch (e) {} };
   const soon = () => { if (!timer && file) { timer = setTimeout(save, 200); if (timer.unref) timer.unref(); } };
-  const backing = new Proxy(data, {
-    set(t, k, v) { t[k] = v; soon(); return true; },
-    deleteProperty(t, k) { delete t[k]; soon(); return true; },
-  });
-  return { backing, flush: () => { if (timer) { clearTimeout(timer); save(); } } };
+  return {
+    data,
+    // a change the child reports: a bounded string key and value, written only to this agent's own profile file
+    apply(k, v) {
+      if (typeof k !== 'string' || k.length > 200) return;
+      if (v === null) { delete data[k]; soon(); return; }
+      if (typeof v !== 'string' || v.length > MAX_VALUE) return;
+      if (!(k in data) && Object.keys(data).length >= MAX_KEYS) return;
+      data[k] = v; soon();
+    },
+    set(k, v) { data[k] = v; soon(); },
+    flush: () => { if (timer) { clearTimeout(timer); save(); } },
+  };
 }
 
-// coreTransport(url, cfg): cfg = { name, relay?, room?, password?, profile?, webrtc?, fetch?, log? }
+// coreTransport(url, cfg): cfg = { name, relay?, room?, password?, profile?, coreKeys?, fetch?, log? }
+// coreKeys: public keys (base64) to trust in place of GifOS's pinned key, for a core you built and signed yourself.
+// It is the operator's choice, never something a meeting link can set.
 export async function coreTransport(url, cfg = {}) {
   if (+process.versions.node.split('.')[0] < 22) throw new Error('Joining with { core: true } needs Node 22 or later (this is Node ' + process.versions.node + ').');
-  const fetchFn = cfg.fetch || globalThis.fetch;
   const origin = new URL(url).origin;
-  const { host, site } = await loadHost(origin, fetchFn);
-  const webrtc = cfg.webrtc || require('werift');
+  const core = await fetchSignedCore(origin, { fetch: cfg.fetch, keys: cfg.coreKeys });
   const store = profileStore(cfg.profile);
   // what the Playwright transport's start script sets in the page's storage
-  if (cfg.name) { store.backing.gifos_name = cfg.name; store.backing.gifos_meet_bar = '0'; }
-  if (cfg.relay) store.backing.gifos_relay = cfg.relay;
-  if (cfg.room && cfg.password) store.backing['gifos_vpw_' + cfg.room] = cfg.password;
+  if (cfg.name) { store.set('gifos_name', cfg.name); store.set('gifos_meet_bar', '0'); }
+  if (cfg.relay) store.set('gifos_relay', cfg.relay);
+  if (cfg.room && cfg.password) store.set('gifos_vpw_' + cfg.room, cfg.password);
   const session = cfg.name ? { gifos_appear_ok: '1' } : {};
 
-  let onEv = null;
-  const early = [];
-  const push = (ev) => { if (onEv) onEv(ev); else early.push(ev); };
-  const m = host.createMeeting({
-    url, site, webrtc, storage: store.backing, session,
-    log: (lvl, ...a) => { if (cfg.log) cfg.log(lvl, ...a); },
+  const wr = cfg.noWebrtc ? null : werift();
+  const child = fork(CHILD, [], {
+    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], ['--max-old-space-size=1024']),
+    env: {}, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'json',
   });
-  let closed = false, hooked = false;
-  const hook = () => {
-    const a = m.agent();
-    if (!a || hooked) return !!a;
-    hooked = true;
-    a.on('*', (ev) => {
-      let d = ev.data;
-      if (d && typeof d === 'object' && (d.samples || d.track || d.onFrame)) { d = Object.assign({}, d); delete d.samples; delete d.track; delete d.onFrame; }
-      let copy; try { copy = d === undefined ? undefined : JSON.parse(JSON.stringify(d)); } catch (e) { copy = undefined; }
-      push({ type: ev.type, data: copy });
-    });
-    return true;
-  };
-  hook();
+  const childLog = (d) => { if (cfg.log) cfg.log('child', String(d).slice(0, 4000)); };
+  child.stdout.on('data', childLog);
+  child.stderr.on('data', childLog);
+
+  let onEv = null, readyAt = 0, failed = '', closed = false, exited = false;
+  const early = [], waiting = new Map(), readyWait = new Set();
+  let nextId = 0;
+  const push = (ev) => { if (onEv) onEv(ev); else early.push(ev); };
+  const settleAll = (why) => { for (const res of waiting.values()) res({ ok: false, error: why }); waiting.clear(); for (const f of readyWait) f(); readyWait.clear(); };
+  child.on('message', (msg) => {
+    if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
+    if (msg.t === 'ev' && typeof msg.type === 'string') push({ type: msg.type, data: msg.data });
+    else if (msg.t === 'reply') { const res = waiting.get(msg.id); if (res) { waiting.delete(msg.id); res(msg.r && typeof msg.r === 'object' ? msg.r : { ok: false, error: 'The meeting answered something that cannot be carried.' }); } }
+    else if (msg.t === 'store') store.apply(msg.k, msg.v);
+    else if (msg.t === 'ready') { readyAt = Date.now(); for (const f of readyWait) f(); readyWait.clear(); }
+    else if (msg.t === 'fail') { failed = String(msg.error || 'The meeting core stopped.').slice(0, 500); settleAll(failed); }
+    else if (msg.t === 'log' && Array.isArray(msg.a) && cfg.log) cfg.log(...msg.a.map((x) => String(x)));
+  });
+  child.on('exit', () => {
+    exited = true;
+    store.flush();
+    settleAll('The meeting core stopped.');
+    if (!closed) { closed = true; push({ type: 'left', data: { reason: 'manual', why: failed ? 'core-failed' : 'core-exited' } }); }
+  });
+  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null } });
 
   return {
     kind: 'core',
-    meeting: m,
+    build: core.build,
+    pid: child.pid,
     onEvent(fn) { onEv = fn; for (const ev of early.splice(0)) fn(ev); },
-    async hookNow() { hook(); },
+    async hookNow() {},
     async ready(ms) {
-      const end = Date.now() + (ms || 60000);
-      for (;;) {
-        if (hook() && m.agent().version >= 1) return;
-        if (Date.now() > end) throw new Error('The meeting core did not start its agent API in ' + Math.round((ms || 60000) / 1000) + ' s.');
-        await new Promise((r) => setTimeout(r, 100));
-      }
+      const lim = ms || 60000;
+      if (!readyAt && !failed && !exited) await new Promise((res) => { const t = setTimeout(res, lim); readyWait.add(() => { clearTimeout(t); res(); }); });
+      if (readyAt) return;
+      throw new Error(failed || 'The meeting core did not start its agent API in ' + Math.round(lim / 1000) + ' s.');
     },
-    async call(name, args) {
-      if (closed) return { ok: false, error: 'This meeting is closed.' };
-      const a = m.agent();
-      if (!a) return { ok: false, error: 'The meeting has no agent API yet.' };
-      const r = await a.call(name, args);
-      if (r && typeof r === 'object') { delete r.track; delete r.onFrame; }
-      try { return JSON.parse(JSON.stringify(r)); } catch (e) { return { ok: false, error: 'The meeting answered something that cannot be carried.' }; }
+    call(name, args) {
+      if (closed || exited) return Promise.resolve({ ok: false, error: 'This meeting is closed.' });
+      const id = ++nextId;
+      return new Promise((res) => { waiting.set(id, res); child.send({ t: 'call', id, name: String(name), args: args || {} }); });
     },
     async close() {
       if (closed) return;
       closed = true;
-      await m.close();
+      if (!exited) {
+        await new Promise((res) => {
+          child.once('exit', res);
+          // the goodbye first; then the channel closes, which ends the child once its farewell has left
+          try { child.send({ t: 'close' }, () => { try { child.disconnect(); } catch (e) {} }); } catch (e) { res(); }
+        });
+      }
       store.flush();
       push({ type: 'left', data: { reason: 'manual', why: 'closed' } });
     },

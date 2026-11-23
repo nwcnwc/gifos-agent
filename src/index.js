@@ -8,10 +8,11 @@ import { agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS } from './protocol.js
 import { launch } from './browser.js';
 import { playwrightTransport } from './transport-playwright.js';
 import { coreTransport } from './transport-core.js';
+import { GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore } from './core-trust.js';
 import { kokoroTts } from './tts.js';
 import { toWav, toPcm16 } from './audio.js';
 
-export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport };
+export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore };
 
 // The page address in agent mode. A hash that already carries meeting fields (#v=room) gets agent=1 too.
 export function agentUrl(link) {
@@ -50,7 +51,8 @@ function seated(meet, ms) {
 
 // join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
-// core: true joins with no browser: the meeting's own core runs in this process (loaded from the meeting's site) over
+// core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
+// from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over
 // real WebRTC data channels. Text only for now (chat, lines, people, hands, stage, apps); no voice or video yet.
 export async function join(url, opts = {}) {
   const name = agentName(opts.name, opts.owner);
@@ -81,7 +83,7 @@ export async function join(url, opts = {}) {
 }
 
 async function joinCore(url, name, profile, opts) {
-  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, webrtc: opts.webrtc, log: opts.log });
+  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log });
   const meet = new Meeting(transport, { tts: null });
   meet.core = true;
   const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);

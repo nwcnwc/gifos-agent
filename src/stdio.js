@@ -30,7 +30,7 @@ async function handle(m) {
     if (meet) return out({ id: m.id, ok: false, error: 'This seat already joined a meeting.' });
     const o = m.opts || {};
     try {
-      meet = await join(String(m.join), { name: o.name, owner: o.owner, notesTo: o.notesTo, password: o.password, core: !!o.core, relay: o.relay, profile: o.profile, voice: o.core ? false : o.voice, joinMs: o.joinMs, readyMs: o.readyMs });
+      meet = await join(String(m.join), { name: o.name, owner: o.owner, notesTo: o.notesTo, password: o.password, core: !!o.core, coreKeys: Array.isArray(o.coreKeys) ? o.coreKeys.map(String) : undefined, relay: o.relay, profile: o.profile, voice: o.core ? false : o.voice, joinMs: o.joinMs, readyMs: o.readyMs });
     } catch (e) { return out({ id: m.id, ok: false, error: String((e && e.message) || e) }); }
     meet.on('*', (ev) => { if (!/frame$/.test(ev.type)) out({ event: { type: ev.type, data: ev.data === undefined ? null : ev.data } }); });
     meet.on('left', () => { leave(0); });

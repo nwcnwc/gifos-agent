@@ -41,8 +41,11 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 }
 ```
 
-With no browser at all, pass `core: true`. The meeting's own core then runs inside your Node process. It is loaded
-from the meeting's site, the same scripts a browser would load, so it always matches the meeting's build. Peer links
+With no browser at all, pass `core: true`. The meeting's own core then runs in a child process of yours. It is loaded
+from the meeting's site, the same scripts a browser would load, so it always matches the meeting's build. A meeting
+link is untrusted, so only a core signed by GifOS runs (the key is pinned in this package; an unsigned or changed core
+is refused with a sentence before any of it runs), and the child runs under Node's permission model: no file writes,
+no programs, no workers, an empty environment. See [docs/core-trust.md](docs/core-trust.md). Peer links
 use real WebRTC data channels through the `werift` package. Today this mode is text only: chat, lines, people, hands,
 the Stage and apps. `say()` and the audio and video ports answer that the seat has no voice yet.
 

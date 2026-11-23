@@ -195,14 +195,16 @@ class Meeting:
         await self.leave()
 
 
-async def join(url, name=None, owner=None, core=True, password=None, relay=None, profile=None, join_ms=None, command=None):
+async def join(url, name=None, owner=None, core=True, password=None, relay=None, profile=None, join_ms=None, command=None, core_keys=None):
     """Join a meeting and return its Meeting once the seat is in. core=True runs the meeting's core with no browser
     (needs Node 22+); core=False drives a meeting page in a Chrome or Edge already on this computer. A room with a
-    password raises MeetingError: ask your human for it and pass password=."""
+    password raises MeetingError: ask your human for it and pass password=. core_keys: public keys (base64) to trust in
+    place of GifOS's own for a core you built and signed yourself (the Node package pins GifOS's key; a site's core
+    that is not signed by a trusted key never runs)."""
     proc = await asyncio.create_subprocess_exec(*(command or bridge_command()), stdin=asyncio.subprocess.PIPE,
                                                 stdout=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024)
     meet = Meeting(proc)
-    opts = {"name": name, "owner": owner, "core": bool(core), "password": password, "relay": relay, "profile": profile, "joinMs": join_ms}
+    opts = {"name": name, "owner": owner, "core": bool(core), "password": password, "relay": relay, "profile": profile, "joinMs": join_ms, "coreKeys": list(core_keys) if core_keys else None}
     try:
         r = await meet._send({"join": url, "opts": {k: v for k, v in opts.items() if v is not None}})
     except MeetingError:
