@@ -12,16 +12,19 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./kit": "./kit/index.js"
   },
   "bin": {
     "gifos-agent-bridge": "examples/shell-bridge.mjs",
-    "gifos-agent-stdio": "src/stdio.js"
+    "gifos-agent-stdio": "src/stdio.js",
+    "gifos-bot": "kit/bin.mjs"
   },
   "files": [
     "src",
     "examples",
     "!examples/core-bot.mjs",
+    "kit",
     "README.md",
     "LICENSE"
   ],

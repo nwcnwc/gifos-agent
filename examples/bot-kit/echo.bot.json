@@ -1,0 +1,6 @@
+{
+  "name": "Echo",
+  "link": "https://gifos.app/meet/your-room",
+  "brain": { "provider": "fixed" },
+  "voice": { "provider": "none" }
+}
