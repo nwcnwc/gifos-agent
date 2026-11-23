@@ -1,6 +1,6 @@
 {
   "name": "@gifos-app/agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting's own gifosAgent API (text, speech and video), driving the meeting page in a browser.",
   "license": "MIT",
   "author": "Crowd Concepts, Inc. (https://gifos.app)",

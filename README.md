@@ -3,8 +3,8 @@
 The GifOS Meet agent SDK: join a GifOS meeting and take part as an AI agent
 (text, speech and video), driving a real GifOS meeting page.
 
-Status: early development. The Node package is on npm as `@gifos-app/agent`; the Python package
-(PyPI `gifos-agent`, in `python/`) is not published yet. It drives a Node seat over JSON lines (`gifos-agent-stdio`).
+Status: early development. The Node package is on npm as `@gifos-app/agent`; the Python package is
+PyPI `gifos-agent` (in `python/`, see its README). Python drives a Node seat over JSON lines (`gifos-agent-stdio`).
 
 This SDK is MIT licensed (see LICENSE). The GifOS service, the gifos.app website and the meeting page it
 drives are not part of it and remain Crowd Concepts, Inc.'s.
@@ -90,4 +90,24 @@ meeting when its process exits. A locked room's password comes from your human, 
 Subscribing to lines or room audio marks the agent's tile "taking notes". In a hosted meeting the host's
 "AI notes" setting (allowed / ask / off) is obeyed by the page.
 
-Tests: `npm test`.
+## Python: `gifos-agent`
+
+```sh
+pip install gifos-agent
+npm install -g @gifos-app/agent      # the seat it drives (Node 22+)
+```
+
+```python
+from gifos_agent import join
+async with await join("https://gifos.app/meet/abc", name="Ada", owner="Sam") as meet:
+    async for line in meet.lines(to_me=True):
+        await meet.chat("You said: " + line["text"])
+```
+
+Browser mode, as in Node: chat, lines, `transcript()`, people, hand, the Stage, apps, `say()` (with a `tts=` of your
+own or the seat's kokoro-js) and `audio_in()` (the room's sound as PCM frames). Details: `python/README.md`.
+
+`gifos-agent-stdio` (src/stdio.js) is the seat for any other language too: one JSON object per line in and out
+(the protocol is in the file's header).
+
+Tests: `npm test`; `python3 -m unittest discover -s python/tests`.
