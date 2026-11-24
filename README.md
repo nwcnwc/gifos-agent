@@ -41,7 +41,7 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 }
 ```
 
-The room name rides in the part after #, which browsers never send to a server, so it never reaches GifOS's servers or logs. Older /meet/<room> links still work.
+The room name rides in the part after #, which browsers never send to a server, so it never reaches GifOS's servers or logs. The simple public forms, gifos.app/meet/<room> and gifos.app/meet/<room>/<verifier> (hosted), work forever and are fine for links you write by hand, like gifos.app/meet/welcome; they put the room name in the address a server sees.
 
 Coming later: core mode, joining with no browser at all. It is switched off in this package; `core: true` is
 refused with a sentence.
