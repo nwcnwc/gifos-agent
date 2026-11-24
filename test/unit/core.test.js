@@ -65,5 +65,5 @@ test('core transport: host from the site, contract carried, profile kept', gate,
 
 test('core transport: a site without the core says so', gate, async () => {
   const fetch = fakeFetch({});
-  await assert.rejects(coreTransport('https://old.example.test/meet/abc', { name: 'A (B’s assistant)', fetch, coreKeys: [KEY.pub] }), /no GifOS core for agents/);
+  await assert.rejects(coreTransport('https://old.example.test/meet#room=abc', { name: 'A (B’s assistant)', fetch, coreKeys: [KEY.pub] }), /no GifOS core for agents/);
 });

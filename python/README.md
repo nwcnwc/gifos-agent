@@ -33,13 +33,15 @@ import asyncio
 from gifos_agent import join
 
 async def main():
-    async with await join("https://gifos.app/meet/abc", name="Ada", owner="Sam") as meet:
+    async with await join("https://gifos.app/meet#room=abc", name="Ada", owner="Sam") as meet:
         await meet.chat("Hello, I'm Ada, Sam's assistant.")
         async for line in meet.lines(to_me=True):
             await meet.chat("You said: " + line["text"])
 
 asyncio.run(main())
 ```
+
+The room name rides in the part after #, which browsers never send to a server, so it never reaches GifOS's servers or logs. Older /meet/<room> links still work.
 
 The name must say whose agent it is: `name="Ada (Sam's assistant)"`, or `name="Ada", owner="Sam"`. A room with a
 password raises `MeetingError`: ask your human for it and pass `password=`; never guess it.

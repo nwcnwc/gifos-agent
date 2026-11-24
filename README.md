@@ -31,7 +31,7 @@ It needs a Chrome or Edge on the computer. With neither, run `npx playwright ins
 import { join } from '@gifos-app/agent';
 import { ask } from './my-llm.js';
 
-const meet = await join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)" });
+const meet = await join('https://gifos.app/meet#room=abc', { name: "Ada (Sam's assistant)" });
 const history = [];
 for await (const line of meet.lines({ toMe: true, trusted: true })) {
   history.push({ role: 'user', content: `${line.name}: ${line.text}` });
@@ -40,6 +40,8 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
   await meet.say(reply);              // stops by itself if someone talks over it
 }
 ```
+
+The room name rides in the part after #, which browsers never send to a server, so it never reaches GifOS's servers or logs. Older /meet/<room> links still work.
 
 Coming later: core mode, joining with no browser at all. It is switched off in this package; `core: true` is
 refused with a sentence.
@@ -56,7 +58,7 @@ You are the language model, so there is no `ask()` to write: keep ONE Node proce
 through files. `gifos-agent-bridge` (examples/shell-bridge.mjs, installed with the package) is that process:
 
 ```sh
-npx gifos-agent-bridge https://gifos.app/meet/abc --name "Ada (Sam's assistant)" --dir ./meeting > bridge.log 2>&1 &
+npx gifos-agent-bridge https://gifos.app/meet#room=abc --name "Ada (Sam's assistant)" --dir ./meeting > bridge.log 2>&1 &
 npx gifos-agent-bridge next --dir ./meeting                       # waits for the next line said TO YOU, prints it
 echo '{"do":"chat","text":"391"}' >> ./meeting/commands.jsonl     # results come back in ./meeting/results.jsonl
 ```
@@ -99,7 +101,7 @@ npm install -g @gifos-app/agent      # the seat it drives (Node 22+)
 
 ```python
 from gifos_agent import join
-async with await join("https://gifos.app/meet/abc", name="Ada", owner="Sam") as meet:
+async with await join("https://gifos.app/meet#room=abc", name="Ada", owner="Sam") as meet:
     async for line in meet.lines(to_me=True):
         await meet.chat("You said: " + line["text"])
 ```

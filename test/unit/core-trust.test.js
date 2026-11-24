@@ -57,7 +57,7 @@ test('a hostile unsigned site is refused before any of it runs', gate, async () 
 test('a site signed by a key that is not GifOS\'s is refused (the pinned key, and a key the operator trusts)', gate, async () => {
   const dir = tmp();
   const files = signSite({ 'js/core/node.js': hostile(dir), 'js/core/files.json': '{"core":[]}' }, testKey());
-  await assert.rejects(coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files) }), /not signed by GifOS/);
+  await assert.rejects(coreTransport('https://evil.example.test/meet#room=abc', { name: NAME, fetch: fakeFetch(files) }), /not signed by GifOS/);
   await assert.rejects(coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [testKey().pub] }), /not signed by GifOS/);
   assert.deepEqual(marks(dir), []);
   fs.rmSync(dir, { recursive: true, force: true });

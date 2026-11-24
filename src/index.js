@@ -24,13 +24,15 @@ export function agentUrl(link) {
   return u.toString();
 }
 
-// The room in a meeting link: /meet/<room>, or #v=<room> on the page itself.
+// The room in a meeting link: /meet#room=<room>[&v=<verifier>] (the link GifOS
+// hands out), the older /meet/<room> or /cast/<room>, or #v=<room>[&av=<verifier>] on the page itself.
 export function roomOf(link) {
   try {
     const u = new URL(link);
     const h = new URLSearchParams(u.hash.replace(/^#/, ''));
+    if (h.get('room')) return h.get('room') + (h.get('v') ? '.' + h.get('v').toLowerCase() : '');
     if (h.get('v')) return h.get('v') + (h.get('av') ? '.' + h.get('av') : '');
-    const m = u.pathname.match(/\/(?:meet|m)\/([^/?#]+)/);
+    const m = u.pathname.match(/\/(?:meet|cast|m)\/([^/?#]+)/);
     return m ? decodeURIComponent(m[1]) : '';
   } catch (e) { return ''; }
 }

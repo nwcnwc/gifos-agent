@@ -120,6 +120,7 @@ test('helpers: agent address, room, WAV, browser order', () => {
   assert.match(agentUrl('https://gifos.app/meet/abc'), /\?agent=1$/);
   assert.match(agentUrl('http://127.0.0.1:8099/run.html#v=room1'), /#v=room1&agent=1$/);
   assert.equal(roomOf('https://gifos.app/meet/abc'), 'abc');
+  assert.equal(roomOf('https://gifos.app/meet#room=abc'), 'abc');
   assert.equal(roomOf('http://127.0.0.1:8099/run.html#v=r1'), 'r1');
   const w = toWav(new Int16Array([0, 1]), 16000);
   assert.equal(w.readUInt32LE(24), 16000);
@@ -138,6 +139,35 @@ test('join() drives a Playwright chromium the caller hands it', async () => {
   await assert.rejects(join('https://gifos.app/meet/abc', { name: "Ada (Sam's assistant)", chromium, profile: '/nonexistent/agent-profile' }), /Chrome or Edge|GIFOS_CHROME/);
   assert.ok(seen.length >= 1, 'the given chromium was asked to launch');
   assert.equal(seen[0].dir, '/nonexistent/agent-profile');
+});
+
+test('every link builder emits the fragment form', () => {
+  // This package joins a link; it does not mint one. agentUrl is the only
+  // exported function that writes a URL, and it keeps the room in the hash.
+  const room = 'abc123';
+  const v = 'a'.repeat(24);
+  for (const link of [
+    'https://gifos.app/meet#room=' + room,
+    'https://gifos.app/meet#room=' + room + '&v=' + v,
+    'https://gifos.app/cast#room=' + room + '&v=' + v + '&at=1',
+  ]) {
+    const out = new URL(agentUrl(link));
+    assert.equal(out.pathname === '/meet' || out.pathname === '/cast', true);
+    assert.equal(out.pathname.includes(room), false);
+    assert.equal(new URLSearchParams(out.hash.replace(/^#/, '')).get('room'), room);
+  }
+});
+
+test('old path forms and the fragment form both name the room', () => {
+  const R = 'Room42';
+  const V = '3783bb03122c41d92d295bab';
+  assert.equal(roomOf('https://gifos.app/meet/' + R), R);
+  assert.equal(roomOf('https://gifos.app/meet/' + R + '/' + V), R);
+  assert.equal(roomOf('https://gifos.app/cast/' + R + '/' + V), R);
+  assert.equal(roomOf('https://gifos.app/meet#room=' + R), R);
+  assert.equal(roomOf('https://gifos.app/meet#room=' + R + '&v=' + V), R + '.' + V);
+  assert.equal(roomOf('https://gifos.app/cast#room=' + R + '&v=' + V + '&at=1'), R + '.' + V);
+  assert.equal(roomOf('https://gifos.app/run.html#v=' + R + '&av=' + V + '&bc=1'), R + '.' + V);
 });
 
 test('ACTIONS include rights and credentials', () => {

@@ -84,7 +84,7 @@ class MeetingTest(unittest.TestCase):
 
     def test_join_defaults_to_browser_mode(self):
         async def go():
-            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            meet = await join("https://example.invalid/meet#room=x", name="Pyra", owner="Sam", command=CMD)
             self.assertFalse(meet.core)
             log = (await meet.call("echo"))["log"]
             self.assertIs(log[0]["opts"]["core"], False)      # core=False is what goes to the seat
@@ -101,7 +101,7 @@ class MeetingTest(unittest.TestCase):
 
     def test_join_calls_lines_leave(self):
         async def go():
-            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            meet = await join("https://example.invalid/meet#room=x", name="Pyra", owner="Sam", command=CMD)
             async def first(it):
                 async for line in it:
                     return line["text"]
@@ -161,7 +161,7 @@ class MeetingTest(unittest.TestCase):
 
     def test_say_without_a_voice_raises_the_sentence(self):
         async def go():
-            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            meet = await join("https://example.invalid/meet#room=x", name="Pyra", owner="Sam", command=CMD)
             with self.assertRaises(MeetingError) as e:
                 await meet.say("hi")
             self.assertIn("No voice", str(e.exception))
@@ -205,7 +205,7 @@ class MeetingTest(unittest.TestCase):
 
     def test_rights_and_use_credentials(self):
         async def go():
-            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", command=CMD)
+            meet = await join("https://example.invalid/meet#room=x", name="Pyra", owner="Sam", command=CMD)
             held = await meet.rights()
             self.assertEqual(held["signed"], True)
             self.assertEqual(held["meetings"], 3)

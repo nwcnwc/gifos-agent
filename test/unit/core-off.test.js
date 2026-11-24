@@ -18,7 +18,7 @@ test('the refusal is one plain sentence', gate, () => {
 test('join(url, { core: true }) is refused with that sentence, before any browser or network', gate, async () => {
   const chromium = { executablePath: () => process.execPath, async launchPersistentContext() { throw new Error('a browser was launched'); } };
   await assert.rejects(join('https://gifos.app/meet/abc', { name: NAME, core: true, chromium, profile: '/nonexistent/agent-profile' }), (e) => e.message === SENTENCE);
-  await assert.rejects(coreTransport('https://gifos.app/meet/abc', { name: NAME, fetch: async () => { throw new Error('fetched'); } }), (e) => e.message === SENTENCE);
+  await assert.rejects(coreTransport('https://gifos.app/meet#room=abc', { name: NAME, fetch: async () => { throw new Error('fetched'); } }), (e) => e.message === SENTENCE);
 });
 
 test('browser mode is unaffected: core: false still drives the browser', gate, async () => {
@@ -33,7 +33,7 @@ test('the stdio bridge refuses a core join with the same sentence', gate, async 
   const p = spawn(process.execPath, [bin], { stdio: ['pipe', 'pipe', 'inherit'] });
   let buf = '';
   const answer = new Promise((resolve) => p.stdout.on('data', (d) => { buf += d; const i = buf.indexOf('\n'); if (i >= 0) resolve(JSON.parse(buf.slice(0, i))); }));
-  p.stdin.write(JSON.stringify({ id: 1, join: 'https://gifos.app/meet/abc', opts: { name: NAME, core: true } }) + '\n');
+  p.stdin.write(JSON.stringify({ id: 1, join: 'https://gifos.app/meet#room=abc', opts: { name: NAME, core: true } }) + '\n');
   const a = await answer;
   p.stdin.end();
   await new Promise((r) => p.on('exit', r));

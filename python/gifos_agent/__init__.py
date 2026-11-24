@@ -9,7 +9,7 @@ room rule stays with the meeting: chat, lines, people, hands, the Stage, apps, v
     from gifos_agent import join
 
     async def main():
-        async with await join("https://gifos.app/meet/abc", name="Ada (Sam's assistant)") as meet:
+        async with await join("https://gifos.app/meet#room=abc", name="Ada (Sam's assistant)") as meet:
             async for line in meet.lines(to_me=True):
                 await meet.chat("You said: " + line["text"])
 
