@@ -40,14 +40,28 @@ A Node `vm` context is not a security boundary: any host object handed to it (a 
 to the host's `Function` and from there to `process`. So the core runs in its own Node process, started by the SDK as
 
     node --permission --allow-fs-read=<src/core-child.cjs> --allow-fs-read=<the node_modules root werift resolves in> \
+         [--allow-fs-read=<opusscript> --allow-fs-read=<VP8 build> --allow-fs-read=<src/core-worker.cjs> --allow-worker] \
          --max-old-space-size=1024 src/core-child.cjs
+
+  (the bracketed reads are added only for folders outside werift's root; the VP8 ones and `--allow-worker` only for a
+  core with a Node video port)
 
   started with `fork(..., { env: {}, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'json' })` and its own
   `execArgv` (not the parent's).
 
-- No file writes, no child processes, no worker threads, no native addons, no WASI, no inspector (Node's permission
-  model refuses them with `ERR_ACCESS_DENIED`). File reads only of the child script and the folder werift and its
-  dependencies sit in (werift is required by its resolved path).
+- No file writes, no child processes, no native addons, no WASI, no inspector (Node's permission model refuses them
+  with `ERR_ACCESS_DENIED`). File reads only of the child script, the folder werift and its dependencies sit in (werift
+  is required by its resolved path), opusscript's folder and, for a core with a Node video port, the VP8 build's
+  folder (`@libav.js/variant-vp8-opus`) and `src/core-worker.cjs`.
+- Threads: none, except the VP8 encoder's, and only for a core whose signed `files.json` names a Node video port
+  (`nodeMedia.video`). Then the child gets `--allow-worker`. Node's permission model holds a worker only when the worker
+  inherits the process's flags (one started with its own `execArgv` runs unconfined) and a worker's `process.kill` is
+  its own, so the real `Worker` never reaches the core: before the core runs, the child replaces
+  `worker_threads.Worker` (the builtin's one exports object that `require`, `process.getBuiltinModule` and `import()`
+  all read; the ESM view is resynced) for good with a boxed one. It takes only code as text, starts it under
+  `src/core-worker.cjs` with the process's own flags, and passes the core's `workerData` through, nothing else. In
+  that thread `require` gives out only `worker_threads` (its port and that `workerData`) and the VP8 build by its
+  exact path, `process.kill` throws, and no further thread starts.
 - An empty environment: API keys and other secrets in the agent's environment never reach the core, and
   `NODE_OPTIONS` cannot loosen the flags.
 - The child has no stdin and its stdout and stderr go to the SDK's log: under `gifos-agent-stdio` (the Python
@@ -61,7 +75,10 @@ to the host's `Function` and from there to `process`. So the core runs in its ow
 - The parent and the child speak the transport's own messages over IPC: `call(name, args)` and its answer, page events,
   `close`. The parent never evaluates anything the child sends; answers are plain JSON.
 - Inside the child, the host's `require` hands out only `vm` (the participant's own context), `crypto` (WebCrypto for
-  the core's keys and signatures) and `os` (the CPU count a page reports). A `vm` context is not a boundary (any host
+  the core's keys and signatures), `os` (the CPU count a page reports) and, with the VP8 build, the boxed
+  `worker_threads`. The codecs are handed to the host already loaded, as GifOS's own `meet.js --core-media` does:
+  `opts.media = { Opus, opusNative, libav, libavModule }` (opusscript and its own wasm module; the VP8 build's path,
+  which the encoder thread loads, and that file required by the child for the decoders). A `vm` context is not a boundary (any host
   object leads back to `process`), so no inner context is pretended: the permission model is the depth.
 - The parent checks every IPC message's shape; storage changes are bounded string keys and values written only to the
   agent's own profile file. The agent's storage is shared by every site it joins, unlike a browser's per-origin

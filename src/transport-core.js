@@ -12,7 +12,8 @@
 // Peer links use real WebRTC (werift, loaded in the child): data channels for chat, lines, people, hands, stage, apps
 // and the rest of the contract, and media through the core's Node media plane (the site's js/core/media/plane-node.js):
 // say() and audio.out speak on the seat's voice track, audio.in hears the room, encoded with Opus by the opusscript
-// package (WebAssembly, so the child still loads no native addon).
+// package; pictures (packing and forwarding a row's faces) are decoded and encoded with VP8 by @libav.js/variant-vp8-opus.
+// Both are WebAssembly, so the child still loads no native addon.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fork } from 'node:child_process';
@@ -23,6 +24,7 @@ import { CORE_MODE, CORE_MODE_OFF } from './flags.js';
 
 const require = createRequire(import.meta.url);
 const CHILD = fileURLToPath(new URL('./core-child.cjs', import.meta.url));
+const WORKER = fileURLToPath(new URL('./core-worker.cjs', import.meta.url));
 
 // The folder the child may read: the node_modules root werift resolves from (its dependencies sit beside it).
 function werift() {
@@ -38,7 +40,27 @@ function werift() {
 function opus() {
   let pkg; try { pkg = fs.realpathSync(require.resolve('opusscript/package.json')); } catch (e) { throw new Error('Core mode needs the opusscript package (npm install opusscript).'); }
   const root = path.dirname(pkg);
-  return { main: fs.realpathSync(require.resolve('opusscript')), root };
+  const native = path.join(root, 'build', 'opusscript_native_wasm.js');   // its own wasm module (the host drives it directly)
+  return { main: fs.realpathSync(require.resolve('opusscript')), root, native: fs.existsSync(native) ? native : null };
+}
+
+// The VP8 build the media plane paints and encodes pictures with (WebAssembly, run in a thread): its main file and
+// its package folder (no dependencies). Without it the seat still carries voice and ears, but no picture: no camera, no
+// packing, no forwarding of pictures; so it is a dependency of this package and missing only in a broken install.
+function vp8() {
+  let main; try { main = fs.realpathSync(require.resolve('@libav.js/variant-vp8-opus')); } catch (e) { return null; }
+  let d = path.dirname(main);
+  for (;;) {
+    try { if (JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8')).name === '@libav.js/variant-vp8-opus') return { main, root: d }; } catch (e) {}
+    if (path.dirname(d) === d) return null;
+    d = path.dirname(d);
+  }
+}
+
+// Does the signed core have a Node video port (files.json "nodeMedia".video)? Only then is the VP8 build handed over,
+// and only then may the child start a thread (the encoder's).
+function siteHasVideo(texts) {
+  try { const f = JSON.parse(texts['js/core/files.json']); return !!(f && f.nodeMedia && f.nodeMedia.video); } catch (e) { return false; }
 }
 
 // The agent's localStorage, kept in its profile folder: its person key lives there, so it is the same person across joins.
@@ -82,8 +104,12 @@ export async function coreTransport(url, cfg = {}) {
 
   const wr = cfg.noWebrtc ? null : werift();
   const op = wr ? opus() : null;   // media rides the peer links: no WebRTC, no media
+  const vp = op && siteHasVideo(core.texts) ? vp8() : null;
+  const read = (root) => (wr && root.startsWith(wr.root + path.sep) ? [] : ['--allow-fs-read=' + root]);
   const child = fork(CHILD, [], {
-    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], op && !(wr && op.root.startsWith(wr.root + path.sep)) ? ['--allow-fs-read=' + op.root] : [], ['--max-old-space-size=1024']),
+    // a thread only for the VP8 encoder, and only through the child's boxed Worker (core-child.cjs THREADS)
+    execArgv: ['--permission', '--allow-fs-read=' + CHILD].concat(wr ? ['--allow-fs-read=' + wr.root] : [], op ? read(op.root) : [],
+      vp ? read(vp.root).concat(['--allow-fs-read=' + WORKER, '--allow-worker']) : [], ['--max-old-space-size=1024']),
     env: {}, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'json',
   });
   const childLog = (d) => { if (cfg.log) cfg.log('child', String(d).slice(0, 4000)); };
@@ -110,7 +136,7 @@ export async function coreTransport(url, cfg = {}) {
     settleAll('The meeting core stopped.');
     if (!closed) { closed = true; push({ type: 'left', data: { reason: 'manual', why: failed ? 'core-failed' : 'core-exited' } }); }
   });
-  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null } });
+  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null, opusNative: op ? op.native : null, libav: vp ? vp.main : null } });
 
   return {
     kind: 'core',
