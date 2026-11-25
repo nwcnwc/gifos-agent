@@ -57,11 +57,17 @@ function vp8() {
   }
 }
 
-// Does the signed core have a Node video port (files.json "nodeMedia".video)? Only then is the VP8 build handed over,
-// and only then may the child start a thread (the encoder's).
-function siteHasVideo(texts) {
-  try { const f = JSON.parse(texts['js/core/files.json']); return !!(f && f.nodeMedia && f.nodeMedia.video); } catch (e) { return false; }
+// Does the signed core have a Node media plane with a video port (files.json "nodeMedia".host, .plane, .video)?
+// Every seat must carry media; without that plane a core join is refused (except cfg.noWebrtc, for tests). Only with
+// it is the VP8 build handed over, and only then may the child start a thread (the encoder's).
+function siteHasMediaPlane(texts) {
+  try {
+    const nm = JSON.parse(texts['js/core/files.json']).nodeMedia;
+    return !!(nm && nm.host && nm.plane && nm.video);
+  } catch (e) { return false; }
 }
+
+const NO_MEDIA_PLANE = "This site's GifOS core cannot carry a seat's media with no browser yet (it is older than core mode); join without { core: true } to use a browser.";
 
 // The agent's localStorage, kept in its profile folder: its person key lives there, so it is the same person across joins.
 const MAX_KEYS = 512, MAX_VALUE = 256 * 1024;
@@ -95,6 +101,9 @@ export async function coreTransport(url, cfg = {}) {
   if (+process.versions.node.split('.')[0] < 22) throw new Error('Joining with { core: true } needs Node 22 or later (this is Node ' + process.versions.node + ').');
   const origin = new URL(url).origin;
   const core = await fetchSignedCore(origin, { fetch: cfg.fetch, keys: cfg.coreKeys });
+  // Every seat carries media: refuse an older core with no Node media plane (host/plane/video) before forking.
+  // Tests that pass noWebrtc skip this (their fake sites have no media duties).
+  if (!cfg.noWebrtc && !siteHasMediaPlane(core.texts)) throw new Error(NO_MEDIA_PLANE);
   const store = profileStore(cfg.profile);
   // what the Playwright transport's start script sets in the page's storage
   if (cfg.name) { store.set('gifos_name', cfg.name); store.set('gifos_meet_bar', '0'); }
@@ -104,7 +113,7 @@ export async function coreTransport(url, cfg = {}) {
 
   const wr = cfg.noWebrtc ? null : werift();
   const op = wr ? opus() : null;   // media rides the peer links: no WebRTC, no media
-  const vp = op && siteHasVideo(core.texts) ? vp8() : null;
+  const vp = op && siteHasMediaPlane(core.texts) ? vp8() : null;
   const read = (root) => (wr && root.startsWith(wr.root + path.sep) ? [] : ['--allow-fs-read=' + root]);
   const child = fork(CHILD, [], {
     // a thread only for the VP8 encoder, and only through the child's boxed Worker (core-child.cjs THREADS)

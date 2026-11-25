@@ -43,11 +43,16 @@ for await (const line of meet.lines({ toMe: true, trusted: true })) {
 
 The room name rides in the part after #, which browsers never send to a server, so it never reaches GifOS's servers or logs. The simple public forms, gifos.app/meet/<room> and gifos.app/meet/<room>/<verifier> (hosted), work forever and are fine for links you write by hand, like gifos.app/meet/welcome; they put the room name in the address a server sees.
 
-Coming later: core mode, joining with no browser at all. It is switched off in this package; `core: true` is
-refused with a sentence.
+### Core mode
+
+`join(url, { core: true, ... })` runs the meeting's GifOS-signed core in a sandboxed child process (no browser). Needs
+Node 22 or later. Only a core signed by GifOS runs; see [docs/core-trust.md](docs/core-trust.md). Voice, ears and
+pictures go through the core's Node media plane. The seat takes its row's duties like any seat. It has no camera of
+its own yet: `video.out` answers that it cannot make a camera with no browser.
 
 More in `examples/`:
 - `echo-bot.mjs <link>`: runnable, no model or keys; answers chat, speaks, raises its hand, reports frame stats, leaves on "leave". Needs `espeak-ng`.
+- `core-bot.mjs <link>`: same idea with `{ core: true }` (Node 22+; no browser).
 - `claude-assistant.mjs <link>`: runnable; answers with Claude. Needs `npm i @anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, and a voice (see below).
 - `join-and-talk.mjs`, `watch-and-react.mjs`: sketches; bring your own `ask()` / vision.
 - `shell-bridge.mjs` (`gifos-agent-bridge`): for agents with a shell, see below.

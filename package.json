@@ -21,7 +21,6 @@
   "files": [
     "src",
     "examples",
-    "!examples/core-bot.mjs",
     "README.md",
     "LICENSE"
   ],

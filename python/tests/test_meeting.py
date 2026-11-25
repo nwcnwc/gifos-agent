@@ -15,22 +15,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from gifos_agent import join, to_wav, MeetingError, __version__  # noqa: E402
 from gifos_agent.meeting import _line_matches  # noqa: E402
 
-CORE_OFF = "Core mode (joining without a browser) isn't available yet; join without { core: true }."
-
 FAKE = textwrap.dedent(r'''
     import base64, json, struct, sys
-    CORE_OFF = %r
     def out(o): sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()
     log = []
     for raw in sys.stdin:
         m = json.loads(raw)
         log.append(m)
         if "join" in m:
-            if m["opts"].get("core"):
-                out({"id": m["id"], "ok": False, "error": CORE_OFF}); continue
             if m["opts"].get("name") == "NoOwner":
                 out({"id": m["id"], "ok": False, "error": "The name must say whose agent it is."}); continue
-            out({"id": m["id"], "ok": True, "core": False, "state": {"joined": True}})
+            out({"id": m["id"], "ok": True, "core": bool(m["opts"].get("core")), "state": {"joined": True}})
             continue
         c, a = m.get("call"), m.get("args") or {}
         if c == "chat":
@@ -70,7 +65,7 @@ FAKE = textwrap.dedent(r'''
             out({"id": m["id"], "ok": True}); out({"event": {"type": "left", "data": {"reason": "leave"}}}); break
         else:
             out({"id": m["id"], "ok": False, "error": "No such call: " + str(c)})
-''') % CORE_OFF
+''')
 CMD = [sys.executable, "-c", FAKE]
 
 
@@ -92,11 +87,13 @@ class MeetingTest(unittest.TestCase):
             await meet.leave()
         self.run_async(go())
 
-    def test_core_true_raises_the_seats_sentence(self):
+    def test_core_true_joins_through_the_bridge(self):
         async def go():
-            with self.assertRaises(MeetingError) as e:
-                await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", core=True, command=CMD)
-            self.assertEqual(str(e.exception), CORE_OFF)
+            meet = await join("https://example.invalid/meet/x", name="Pyra", owner="Sam", core=True, command=CMD)
+            self.assertTrue(meet.core)
+            log = (await meet.call("echo"))["log"]
+            self.assertIs(log[0]["opts"]["core"], True)
+            await meet.leave()
         self.run_async(go())
 
     def test_join_calls_lines_leave(self):

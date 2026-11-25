@@ -9,8 +9,9 @@ import { coreTransport, Meeting } from '../../src/index.js';
 import { signSite, testKey } from './signed-site.js';
 import { CORE_MODE } from '../../src/flags.js';
 
-// Core mode is switched off in src/flags.js for now; these tests are skipped until it is on (see core.test.js).
+// Skip-gated on CORE_MODE (src/flags.js); core-off.test.js skips itself when it is on.
 const gate = { skip: !CORE_MODE && 'core mode is off (src/flags.js CORE_MODE)' };
+const NO_MEDIA_PLANE = "This site's GifOS core cannot carry a seat's media with no browser yet (it is older than core mode); join without { core: true } to use a browser.";
 
 const fakeFetch = (files) => async (url) => {
   const p = new URL(url).pathname;
@@ -173,21 +174,25 @@ test('a hostile main thread cannot write a file through the boxed Worker, eval o
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a core with no Node video port gets Opus but no libav, and starting any thread is refused', gate, async () => {
-  const dir = tmp();
-  const r = await run({ host: 'x.js', plane: 'y.js' }, dir);
-  assert.equal(r.opusIsFn, true);
-  assert.equal(r.opusNativeOk, true);
-  assert.equal(r.hasLibav, false);
-  assert.equal(r.hasLibavModule, false);
-  assert.match(r.requireWorkerThreads, /may not load/, "require('worker_threads') throws");
-  assert.equal(r.ctorRefused, true, 'constructing the boxed Worker is refused (not armed for a thread)');
-  fs.rmSync(dir, { recursive: true, force: true });
+test('a signed core without nodeMedia.video is refused before the child starts', gate, async () => {
+  // webrtc on (no noWebrtc): every seat must carry media; host+plane without video is not enough
+  const files = signSite({
+    'js/core/node.js': 'module.exports = {};',
+    'js/core/files.json': JSON.stringify({ core: [], nodeMedia: { host: 'x.js', plane: 'y.js' } }),
+  }, KEY);
+  await assert.rejects(
+    coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
+    (e) => e.message === NO_MEDIA_PLANE,
+  );
 });
 
-test('a core with no nodeMedia gets no media at all', gate, async () => {
-  const dir = tmp();
-  const r = await run(null, dir);
-  assert.equal(r.hasMedia, false);
-  fs.rmSync(dir, { recursive: true, force: true });
+test('a signed core with no nodeMedia is refused before the child starts', gate, async () => {
+  const files = signSite({
+    'js/core/node.js': 'module.exports = {};',
+    'js/core/files.json': JSON.stringify({ core: [] }),
+  }, KEY);
+  await assert.rejects(
+    coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
+    (e) => e.message === NO_MEDIA_PLANE,
+  );
 });

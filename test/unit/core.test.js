@@ -8,8 +8,7 @@ import { coreTransport, Meeting } from '../../src/index.js';
 import { signSite, testKey } from './signed-site.js';
 import { CORE_MODE } from '../../src/flags.js';
 
-// Core mode is switched off in src/flags.js for now. These tests are kept for when it is on: they are skipped while
-// CORE_MODE is false and run again by themselves when it is set to true.
+// Skip-gated on CORE_MODE (src/flags.js); core-off.test.js skips itself when it is on.
 const gate = { skip: !CORE_MODE && 'core mode is off (src/flags.js CORE_MODE)' };
 
 // A stand-in for the site's Node host: one participant whose agent answers state/chat and emits events.

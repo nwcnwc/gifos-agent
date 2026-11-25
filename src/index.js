@@ -55,9 +55,9 @@ function seated(meet, ms) {
 // join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
 // core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
-// from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over
-// real WebRTC data channels. Text only for now (chat, lines, people, hands, stage, apps); no voice or video yet.
-// Off for now (src/flags.js): core: true is refused with a sentence.
+// from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over real WebRTC.
+// Voice, ears and pictures go through the core's Node media plane; the seat takes its row's duties like any seat.
+// No camera of its own yet: video.out answers that it cannot make a camera with no browser.
 export async function join(url, opts = {}) {
   if (opts.core && !CORE_MODE) throw new Error(CORE_MODE_OFF);
   const name = agentName(opts.name, opts.owner);

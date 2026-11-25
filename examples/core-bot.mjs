@@ -1,13 +1,13 @@
 // A bot with no browser, no model and no keys: the meeting's own core runs in this process (join(..., { core: true })).
 // Run: node examples/core-bot.mjs https://gifos.app/meet#room=<room>        (Node 22 or later)
 // In chat, say to it: "hi", "who is here", "raise your hand", "lower your hand", "next turn" (in a meeting running
-// Take Turns), "leave". It answers in chat: a core agent has no voice yet.
+// Take Turns), "leave". voice: false keeps answers in chat (pass a tts or drop voice: false to speak).
 import { join } from '../src/index.js';   // in your own project: from '@gifos-app/agent'
 
 const link = process.argv[2];
 if (!link) { console.error('usage: node core-bot.mjs <meeting link>'); process.exit(2); }
 
-const meet = await join(link, { name: 'Echo (demo bot)', core: true });
+const meet = await join(link, { name: 'Echo', owner: 'demo', core: true, voice: false });
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 log('joined with no browser');
 let leaving = false;

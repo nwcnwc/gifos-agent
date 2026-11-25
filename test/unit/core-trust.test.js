@@ -9,8 +9,7 @@ import { coreTransport, Meeting } from '../../src/index.js';
 import { signSite, testKey } from './signed-site.js';
 import { CORE_MODE } from '../../src/flags.js';
 
-// Core mode is switched off in src/flags.js for now. These tests are kept for when it is on: they are skipped while
-// CORE_MODE is false and run again by themselves when it is set to true.
+// Skip-gated on CORE_MODE (src/flags.js); core-off.test.js skips itself when it is on.
 const gate = { skip: !CORE_MODE && 'core mode is off (src/flags.js CORE_MODE)' };
 
 const fakeFetch = (files) => async (url) => {
@@ -66,7 +65,8 @@ test('a site signed by a key that is not GifOS\'s is refused (the pinned key, an
 test('a changed file, a tampered list, an unlisted file and an old build are refused', gate, async () => {
   const dir = tmp(), K = testKey();
   const base = { 'js/core/node.js': hostile(dir), 'js/core/files.json': '{"core":[]}' };
-  const tr = (files) => coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [K.pub] });
+  // noWebrtc: these cases are about the signature, not media duties (fake site has no Node media plane)
+  const tr = (files) => coreTransport('https://evil.example.test/meet/abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [K.pub], noWebrtc: true });
   await assert.rejects(tr(signSite(base, K, { after: { 'js/core/node.js': hostile(dir) + '\n// changed' } })), /changed after GifOS signed it/);
   await assert.rejects(tr(signSite(base, K, { tamper: { 'js/core/node.js': '0'.repeat(64) } })), /not signed by GifOS/);
   await assert.rejects(tr(signSite(base, K, { build: '0.9.27' })), /old GifOS core/);
