@@ -50,6 +50,7 @@ async function start(msg) {
   const webrtc = cfg.noWebrtc ? undefined : require(String(cfg.werift));   // the resolved file (the only folder this process may read)
   m = host.createMeeting({
     url: msg.url, site, webrtc, storage: backing, session: cfg.session || {},
+    media: webrtc && cfg.opus && site.files && site.files.nodeMedia ? { Opus: require(String(cfg.opus)) } : undefined,   // the Node media plane (a core that has one): voice and ears
     log: cfg.log ? (lvl, ...a) => send({ t: 'log', a: [String(lvl)].concat(a.map((x) => String((x && x.stack) || x).slice(0, 2000))) }) : undefined,
   });
   let hooked = false;

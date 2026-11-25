@@ -88,8 +88,9 @@ export async function join(url, opts = {}) {
 }
 
 async function joinCore(url, name, profile, opts) {
+  const tts = opts.tts || (opts.voice === false ? null : await kokoroTts(opts.kokoro || {}));   // the voice first: the seat speaks through the core's media plane
   const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log });
-  const meet = new Meeting(transport, { tts: null });
+  const meet = new Meeting(transport, { tts });
   meet.core = true;
   const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);
   try {
