@@ -136,7 +136,9 @@ export async function coreTransport(url, cfg = {}) {
     settleAll('The meeting core stopped.');
     if (!closed) { closed = true; push({ type: 'left', data: { reason: 'manual', why: failed ? 'core-failed' : 'core-exited' } }); }
   });
-  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null, opusNative: op ? op.native : null, libav: vp ? vp.main : null } });
+  // meshC: room shape (2..5). createMeeting opts.globals GIFOS_SCALE.C; only with DEBUG=on in the link (gifos-net.js).
+  const meshC = Number.isInteger(+cfg.meshC) && +cfg.meshC >= 2 && +cfg.meshC <= 5 ? +cfg.meshC : 0;
+  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null, opusNative: op ? op.native : null, libav: vp ? vp.main : null, meshC: meshC || undefined } });
 
   return {
     kind: 'core',
