@@ -54,7 +54,7 @@ function seated(meet, ms) {
   });
 }
 
-// join(url, { name, owner?, core?, tts?, voice?, password?, hostPassword?, listed?, credentials?, relay?, profile?, headless?, joinMs?, chromium?, meshC? }) -> Meeting
+// join(url, { name, owner?, core?, tts?, voice?, password?, hostPassword?, listed?, credentials?, relay?, profile?, headless?, joinMs?, chromium?, meshC?, payUrl? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
 // core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
 // from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over real WebRTC.
@@ -68,6 +68,8 @@ function seated(meet, ms) {
 // listed: the room's gifos.tv listing (the address "Publish to GifOS.tv" gave). The page then keeps the listing live
 // while this seat hosts the room: its on-air note, a keep-alive every few minutes, its off-air note when it leaves.
 // credentials: a credentials GIF (a subscription file or a pass; a path or the bytes), used before the seat knocks.
+// payUrl (core only, for tests): the payment service of a local GifOS stack (subscriptions, room capture); the core's
+// own default is pay.gifos.app, as for a page with no window.GIFOS_PAY_URL.
 export async function join(url, opts = {}) {
   if (opts.core && !CORE_MODE) throw new Error(CORE_MODE_OFF);
   const name = agentName(opts.name, opts.owner);
@@ -112,7 +114,7 @@ export async function join(url, opts = {}) {
 
 async function joinCore(url, name, profile, opts) {
   const tts = opts.tts || (opts.voice === false ? null : await kokoroTts(opts.kokoro || {}));   // the voice first: the seat speaks through the core's media plane
-  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log, meshC: opts.meshC });
+  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log, meshC: opts.meshC, payUrl: opts.payUrl });
   const meet = new Meeting(transport, { tts });
   meet.core = true;
   meet.link = url;
