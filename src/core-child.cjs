@@ -58,7 +58,11 @@ const BOOT = require('path').join(__dirname, 'core-worker.cjs');
     }
   }
   Object.defineProperty(wt, 'Worker', { value: Worker, writable: false, configurable: false, enumerable: true });
-  require('module').syncBuiltinESMExports();
+  const M = require('module');
+  M.syncBuiltinESMExports();
+  // module.register starts Node's loader-hooks thread with a fresh, unsealed worker_threads: sealed too (the core
+  // loads no code at run time and uses no loader hooks)
+  Object.defineProperty(M, 'register', { value: () => { throw new Error('The GifOS core may not register module hooks.'); }, writable: false, configurable: false });
   armThreads = (file) => { libav = String(file); workers = Object.freeze({ Worker, isMainThread: true }); };
 })();
 

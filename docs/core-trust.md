@@ -61,7 +61,8 @@ to the host's `Function` and from there to `process`. So the core runs in its ow
   all read; the ESM view is resynced) for good with a boxed one. It takes only code as text, starts it under
   `src/core-worker.cjs` with the process's own flags, and passes the core's `workerData` through, nothing else. In
   that thread `require` gives out only `worker_threads` (its port and that `workerData`) and the VP8 build by its
-  exact path, `process.kill` throws, and no further thread starts.
+  exact path, `process.kill` throws, and no further thread starts. `module.register` (which would start Node's
+  loader-hooks thread with a fresh, unsealed `worker_threads`) throws in the child and in that thread.
 - An empty environment: API keys and other secrets in the agent's environment never reach the core, and
   `NODE_OPTIONS` cannot loosen the flags.
 - The child has no stdin and its stdout and stderr go to the SDK's log: under `gifos-agent-stdio` (the Python

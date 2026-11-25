@@ -22,6 +22,15 @@ const NAME = "A (B's assistant)";
 const KEY = testKey();
 
 // A boxed thread's own code: checks what it may and may not do, and tries to write fileInDir (must stay unwritten).
+// module.register: Node's loader-hooks thread gets a fresh worker_threads; this hook starts an unconfined worker there
+// (execArgv []) that writes fileInDir. Refused in the child and in a core thread, so the file never appears.
+function registerTry(fileInDir) {
+  const inner = 'require("fs").writeFileSync(' + JSON.stringify(fileInDir) + ', "x")';
+  const hook = 'import wt from "node:worker_threads"; new wt.Worker(' + JSON.stringify(inner) + ', { eval: true, execArgv: [] }); export async function resolve(s, c, n) { return n(s); }';
+  const url = 'data:text/javascript,' + encodeURIComponent(hook);
+  return `try { process.getBuiltinModule('module').register(${JSON.stringify(url)}); out.registerRefused = false; } catch (e) { out.registerRefused = true; }`;
+}
+
 const threadCode = (fileInDir) => `
   const wt = require('worker_threads');
   const out = {};
@@ -30,6 +39,7 @@ const threadCode = (fileInDir) => `
   try { process.kill(process.pid, 0); out.killRefused = false; } catch (e) { out.killRefused = true; }
   try { new (require('worker_threads').Worker)('1', { eval: true }); out.nestedRefused = false; } catch (e) { out.nestedRefused = true; }
   try { process.getBuiltinModule('fs').writeFileSync(${JSON.stringify(fileInDir)}, 'x'); out.writeCode = null; } catch (e) { out.writeCode = e.code; }
+  ${registerTry(fileInDir + '-register')}
   wt.parentPort.postMessage(out);
 `;
 
@@ -104,6 +114,8 @@ module.exports = {
           r.importNs = { ok: true, sameAsGbm: ns.Worker === gbm.Worker, defaultSame: ns.default.Worker === gbm.Worker };
         } catch (e) { r.importNs = { ok: false, error: String((e && e.message) || e) }; }
 
+        { const out = {}; ${registerTry(path.join(dir, 'main-register-should-not-exist'))}; r.registerRefused = out.registerRefused; }
+        await new Promise((res) => setTimeout(res, 300));   // an escaped hook would have written by now
         return { ok: true, state: r };
       },
     };
@@ -137,6 +149,7 @@ test('a core with a Node video port gets Opus, opusNative, libav and libavModule
   assert.equal(r.thread.fsRefused, true, "a thread's require('fs') is refused");
   assert.equal(r.thread.killRefused, true, "a thread's process.kill is refused");
   assert.equal(r.thread.nestedRefused, true, 'a thread may not start a nested thread');
+  assert.equal(r.thread.registerRefused, true, 'a thread may not register module hooks');
   assert.equal(r.thread.writeCode, 'ERR_ACCESS_DENIED', 'a thread may not write files');
   assert.equal(fs.existsSync(path.join(dir, 'thread-should-not-exist')), false);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -154,6 +167,9 @@ test('a hostile main thread cannot write a file through the boxed Worker, eval o
   // the boxed Worker by another path, so there is nothing to compare Worker identity against)
   assert.equal(r.importNs.ok, false, 'import() is refused in the host context');
   assert.match(r.importNs.error, /dynamic import/i);
+  // (d) module.register (the loader-hooks thread has an unsealed worker_threads) is refused
+  assert.equal(r.registerRefused, true, 'module.register is refused in the host context');
+  assert.equal(fs.existsSync(path.join(dir, 'main-register-should-not-exist')), false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

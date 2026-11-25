@@ -13,7 +13,12 @@ process.kill = () => { throw new Error('The GifOS core may not signal processes.
 try { process._kill = undefined; } catch (e) {}
 const NoWorker = function Worker() { throw new Error('A GifOS core thread may not start threads.'); };
 Object.defineProperty(wt, 'Worker', { value: NoWorker, writable: false, configurable: false, enumerable: true });
-require('module').syncBuiltinESMExports();
+const M = require('module');
+M.syncBuiltinESMExports();
+// the loader-hooks thread would get an unsealed worker_threads (core-child.cjs THREADS)
+Object.defineProperty(M, 'register', { value: () => { throw new Error('A GifOS core thread may not register module hooks.'); }, writable: false, configurable: false });
+// This thread starts no threads of its own: fine for the single-threaded VP8 build; a multithreaded (-mt) libav would
+// need its own pthread workers here.
 
 const port = Object.freeze({ parentPort: wt.parentPort, workerData: data, isMainThread: false });
 function boxedRequire(id) {
