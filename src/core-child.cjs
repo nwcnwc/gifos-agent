@@ -104,10 +104,14 @@ async function start(msg) {
     deleteProperty(t, k) { delete t[k]; send({ t: 'store', k: String(k), v: null }); return true; },
   });
   const webrtc = cfg.noWebrtc ? undefined : require(String(cfg.werift));   // the resolved file (the only folder this process may read)
+  // GIFOS_SCALE before the core runs: same C as every other seat (deriveMeet folds it into the sid; gifos-net.js).
+  const meshC = Number.isInteger(+cfg.meshC) && +cfg.meshC >= 2 && +cfg.meshC <= 5 ? +cfg.meshC : 0;
+  const globals = meshC ? { GIFOS_SCALE: { C: meshC } } : undefined;
   m = host.createMeeting({
     url: msg.url, site, webrtc, storage: backing, session: cfg.session || {},
     media: webrtc && cfg.opus && site.files && site.files.nodeMedia ? nodeMedia(cfg, site.files.nodeMedia) : undefined,   // the Node media plane (a core that has one)
     log: cfg.log ? (lvl, ...a) => send({ t: 'log', a: [String(lvl)].concat(a.map((x) => String((x && x.stack) || x).slice(0, 2000))) }) : undefined,
+    globals,
   });
   let hooked = false;
   const hook = () => {
