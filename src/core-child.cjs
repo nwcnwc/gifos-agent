@@ -106,7 +106,8 @@ async function start(msg) {
   const webrtc = cfg.noWebrtc ? undefined : require(String(cfg.werift));   // the resolved file (the only folder this process may read)
   // GIFOS_SCALE before the core runs: same C as every other seat (deriveMeet folds it into the sid; gifos-net.js).
   const meshC = Number.isInteger(+cfg.meshC) && +cfg.meshC >= 2 && +cfg.meshC <= 5 ? +cfg.meshC : 0;
-  const globals = meshC ? { GIFOS_SCALE: { C: meshC } } : undefined;
+  const payUrl = /^https?:\/\/[^\s'"]+$/.test(String(cfg.payUrl || '')) ? String(cfg.payUrl) : '';   // a local stack's payment service (tests)
+  const globals = meshC || payUrl ? Object.assign({}, meshC ? { GIFOS_SCALE: { C: meshC } } : {}, payUrl ? { GIFOS_PAY_URL: payUrl } : {}) : undefined;
   m = host.createMeeting({
     url: msg.url, site, webrtc, storage: backing, session: cfg.session || {},
     media: webrtc && cfg.opus && site.files && site.files.nodeMedia ? nodeMedia(cfg, site.files.nodeMedia) : undefined,   // the Node media plane (a core that has one)

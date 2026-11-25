@@ -147,7 +147,10 @@ export async function coreTransport(url, cfg = {}) {
   });
   // meshC: room shape (2..5). createMeeting opts.globals GIFOS_SCALE.C; only with DEBUG=on in the link (gifos-net.js).
   const meshC = Number.isInteger(+cfg.meshC) && +cfg.meshC >= 2 && +cfg.meshC <= 5 ? +cfg.meshC : 0;
-  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null, opusNative: op ? op.native : null, libav: vp ? vp.main : null, meshC: meshC || undefined } });
+  // payUrl (core only, for tests): the payment service a local GifOS stack serves (subscriptions, room capture), as a
+  // page gets it from window.GIFOS_PAY_URL. Absent: the core's own default (pay.gifos.app).
+  const payUrl = /^https?:\/\/[^\s'"]+$/.test(String(cfg.payUrl || '')) ? String(cfg.payUrl).replace(/\/$/, '') : '';
+  child.send({ t: 'start', url, origin: core.origin, files: core.texts, storage: store.data, cfg: { session, log: !!cfg.log, noWebrtc: !wr, werift: wr ? wr.main : null, opus: op ? op.main : null, opusNative: op ? op.native : null, libav: vp ? vp.main : null, meshC: meshC || undefined, payUrl: payUrl || undefined } });
 
   return {
     kind: 'core',

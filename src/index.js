@@ -52,7 +52,7 @@ function seated(meet, ms) {
   });
 }
 
-// join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium?, meshC? }) -> Meeting
+// join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium?, meshC?, payUrl? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
 // core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
 // from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over real WebRTC.
@@ -60,6 +60,8 @@ function seated(meet, ms) {
 // No camera of its own yet: video.out answers that it cannot make a camera with no browser.
 // meshC (core only, for tests): room shape C (2..5). deriveMeet folds a C other than 5 into the relay session id: every seat of the room
 // must carry the same C, and a non-default C only takes effect with DEBUG=on in the link (gifos-net.js SCALE.C).
+// payUrl (core only, for tests): the payment service of a local GifOS stack (subscriptions, room capture); the core's
+// own default is pay.gifos.app, as for a page with no window.GIFOS_PAY_URL.
 export async function join(url, opts = {}) {
   if (opts.core && !CORE_MODE) throw new Error(CORE_MODE_OFF);
   const name = agentName(opts.name, opts.owner);
@@ -91,7 +93,7 @@ export async function join(url, opts = {}) {
 
 async function joinCore(url, name, profile, opts) {
   const tts = opts.tts || (opts.voice === false ? null : await kokoroTts(opts.kokoro || {}));   // the voice first: the seat speaks through the core's media plane
-  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log, meshC: opts.meshC });
+  const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log, meshC: opts.meshC, payUrl: opts.payUrl });
   const meet = new Meeting(transport, { tts });
   meet.core = true;
   const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);
