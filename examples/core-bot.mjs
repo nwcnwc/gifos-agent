@@ -1,5 +1,5 @@
 // A bot with no browser, no model and no keys: the meeting's own core runs in this process (join(..., { core: true })).
-// Run: node examples/core-bot.mjs https://gifos.app/meet#room=<room>        (Node 22 or later)
+// Run: GIFOS_CORE_MODE=1 node examples/core-bot.mjs https://gifos.app/meet#room=<room>        (Node 22 or later)
 // In chat, say to it: "hi", "who is here", "raise your hand", "lower your hand", "next turn" (in a meeting running
 // Take Turns), "leave". voice: false keeps answers in chat (pass a tts or drop voice: false to speak).
 import { join } from '../src/index.js';   // in your own project: from '@gifos-app/agent'

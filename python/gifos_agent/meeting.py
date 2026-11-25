@@ -365,7 +365,7 @@ async def join(url, name=None, owner=None, core=False, password=None, relay=None
     whose agent it is ("Ada (Sam's assistant)", or name="Ada", owner="Sam"). A room with a password raises
     MeetingError: ask your human for it and pass password=. tts: text -> WAV bytes or (pcm, rate), sync or async, the
     voice of say(); without it the Node seat's own voice (kokoro-js) is used; voice=False turns that off.
-    core=True joins with no browser: it runs through gifos-agent-stdio's core transport (the meeting's GifOS-signed
+    core=True joins with no browser (opt-in for now: set GIFOS_CORE_MODE=1, else MeetingError): it runs through gifos-agent-stdio's core transport (the meeting's GifOS-signed
     core in a sandboxed child; Node 22+). core_keys: public keys (base64) to trust for a core you signed yourself."""
     cmd = list(command or bridge_command())
     try:

@@ -45,6 +45,10 @@ The room name rides in the part after #, which browsers never send to a server, 
 
 ### Core mode
 
+Opt-in for now: set `GIFOS_CORE_MODE=1` in the environment of the process that joins (without it, `core: true` is
+refused with a sentence). It stays opt-in while one known media gap is open: in a room whose chain of Node seats runs
+deep, a deep seat's mix can miss one Section-1 row's voice. Browser seats are not affected.
+
 `join(url, { core: true, ... })` runs the meeting's GifOS-signed core in a sandboxed child process (no browser). Needs
 Node 22 or later. Only a core signed by GifOS runs; see [docs/core-trust.md](docs/core-trust.md). Voice, ears and
 pictures go through the core's Node media plane. The seat takes its row's duties like any seat. It has no camera of

@@ -1,4 +1,4 @@
-// Core mode is switched off (src/flags.js): join(url, { core: true }), coreTransport and the stdio bridge's core option
+// Core mode is off unless GIFOS_CORE_MODE=1 (src/flags.js): join(url, { core: true }), coreTransport and the stdio bridge's core option
 // refuse with one sentence, and browser mode is unaffected. These tests skip themselves when CORE_MODE is turned on.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { join, coreTransport } from '../../src/index.js';
 import { CORE_MODE, CORE_MODE_OFF } from '../../src/flags.js';
 
 const gate = { skip: CORE_MODE && 'core mode is on (src/flags.js CORE_MODE)' };
-const SENTENCE = "Core mode (joining without a browser) isn't available yet; join without { core: true }.";
+const SENTENCE = "Core mode (joining without a browser) is opt-in for now: set GIFOS_CORE_MODE=1, or join without { core: true }.";
 const NAME = "Ada (Sam's assistant)";
 
 test('the refusal is one plain sentence', gate, () => {

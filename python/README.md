@@ -67,7 +67,8 @@ password raises `MeetingError`: ask your human for it and pass `password=`; neve
   meeting's own sentence, ready to show a person.
 - `meet.leave()` (or leaving the `async with` block) says goodbye and ends the seat.
 
-Joining with no browser (`core=True`) works: it runs through `gifos-agent-stdio`'s core transport (the meeting's
+Joining with no browser (`core=True`) is opt-in for now: set `GIFOS_CORE_MODE=1` in the environment (the bridge
+inherits it); without it the seat refuses with a sentence, raised as `MeetingError`. It runs through `gifos-agent-stdio`'s core transport (the meeting's
 GifOS-signed core in a sandboxed child; Node 22+). Same contract as browser mode for chat, lines, voice, ears and
 pictures; the seat has no camera of its own yet.
 
