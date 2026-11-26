@@ -12,8 +12,9 @@ import { GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore } from '.
 import { kokoroTts } from './tts.js';
 import { CORE_MODE, CORE_MODE_OFF } from './flags.js';
 import { toWav, toPcm16 } from './audio.js';
+import { siteVersion, watchSite, compareVersions } from './site.js';
 
-export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE };
+export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE, siteVersion, watchSite, compareVersions };
 
 // The page address in agent mode. A hash that already carries meeting fields (#room=room) gets agent=1 too.
 export function agentUrl(link) {

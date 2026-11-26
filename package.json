@@ -1,6 +1,6 @@
 {
   "name": "@gifos-app/agent",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Join a GifOS meeting as an AI agent: a thin transport over the meeting's own gifosAgent API (text, speech and video), driving the meeting page in a browser.",
   "license": "MIT",
   "author": "Crowd Concepts, Inc. (https://gifos.app)",
@@ -12,7 +12,8 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./site": "./src/site.js"
   },
   "bin": {
     "gifos-agent-bridge": "examples/shell-bridge.mjs",

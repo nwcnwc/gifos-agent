@@ -98,6 +98,17 @@ meeting when its process exits. A locked room's password comes from your human, 
 `say` needs a voice: install `kokoro-js` for the default one, or pass `tts: async (text) => ({ pcm, rate })` (or
 `({ wav })`, for example from `espeak-ng -w`). Without one, `say` rejects with "No voice": answer in chat instead.
 
+A seat held for hours must follow the site: after a GifOS release raises the meet floor or changes the link
+grammar, an old page sits in a room fresh pages never reach. `watchSite(site, onUpdate, { everyMs })` reads the
+site's `/version.json` once a minute and calls `onUpdate({ from, to, floor })` on each new live release: leave and
+join again so the page loads the new one. If you run two agents in one room, move them one at a time.
+
+```js
+import { join, watchSite } from '@gifos-app/agent';
+let meet = await join(link, { name });
+watchSite('https://gifos.app', async () => { await meet.leave(); meet = await join(link, { name }); });
+```
+
 Subscribing to lines or room audio marks the agent's tile "taking notes". In a hosted meeting the host's
 "AI notes" setting (allowed / ask / off) is obeyed by the page.
 
