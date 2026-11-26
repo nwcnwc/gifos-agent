@@ -129,7 +129,7 @@ module.exports = {
 async function run(nm, dir) {
   const filesJson = JSON.stringify(Object.assign({ core: [] }, nm ? { nodeMedia: nm } : {}));
   const files = signSite({ 'js/core/node.js': HOST(dir), 'js/core/files.json': filesJson }, KEY);
-  const t = await coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] });
+  const t = await coreTransport('https://example.test/run.html#room=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] });
   await t.ready(15000);
   const meet = new Meeting(t);
   const r = await meet.state();
@@ -181,7 +181,7 @@ test('a signed core without nodeMedia.video is refused before the child starts',
     'js/core/files.json': JSON.stringify({ core: [], nodeMedia: { host: 'x.js', plane: 'y.js' } }),
   }, KEY);
   await assert.rejects(
-    coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
+    coreTransport('https://example.test/run.html#room=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
     (e) => e.message === NO_MEDIA_PLANE,
   );
 });
@@ -192,7 +192,7 @@ test('a signed core with no nodeMedia is refused before the child starts', gate,
     'js/core/files.json': JSON.stringify({ core: [] }),
   }, KEY);
   await assert.rejects(
-    coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
+    coreTransport('https://example.test/run.html#room=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [KEY.pub] }),
     (e) => e.message === NO_MEDIA_PLANE,
   );
 });

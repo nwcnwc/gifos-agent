@@ -82,7 +82,7 @@ test('a signed core runs in a child that cannot write files, start programs, see
   process.env.GIFOS_TEST_SECRET = 'sk-not-for-the-core';
   const logs = [];
   const files = signSite({ 'js/core/node.js': hostile(dir), 'js/core/files.json': '{"core":[]}' }, K);
-  const t = await coreTransport('https://example.test/run.html#v=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [K.pub], noWebrtc: true, log: (...a) => logs.push(a.join(' ')) });
+  const t = await coreTransport('https://example.test/run.html#room=abc', { name: NAME, fetch: fakeFetch(files), coreKeys: [K.pub], noWebrtc: true, log: (...a) => logs.push(a.join(' ')) });
   await t.ready(10000);
   const meet = new Meeting(t);
   const r = await meet.call('probe');

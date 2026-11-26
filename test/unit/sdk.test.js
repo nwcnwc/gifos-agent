@@ -118,10 +118,10 @@ test('tools(): JSON-schema tools that act in the meeting', async () => {
 
 test('helpers: agent address, room, WAV, browser order', () => {
   assert.match(agentUrl('https://gifos.app/meet/abc'), /\?agent=1$/);
-  assert.match(agentUrl('http://127.0.0.1:8099/run.html#v=room1'), /#v=room1&agent=1$/);
+  assert.match(agentUrl('http://127.0.0.1:8099/run.html#room=room1'), /#room=room1&agent=1$/);
   assert.equal(roomOf('https://gifos.app/meet/abc'), 'abc');
   assert.equal(roomOf('https://gifos.app/meet#room=abc'), 'abc');
-  assert.equal(roomOf('http://127.0.0.1:8099/run.html#v=r1'), 'r1');
+  assert.equal(roomOf('http://127.0.0.1:8099/run.html#room=r1'), 'r1');
   const w = toWav(new Int16Array([0, 1]), 16000);
   assert.equal(w.readUInt32LE(24), 16000);
   assert.equal(w.length, 48);
@@ -167,7 +167,8 @@ test('old path forms and the fragment form both name the room', () => {
   assert.equal(roomOf('https://gifos.app/meet#room=' + R), R);
   assert.equal(roomOf('https://gifos.app/meet#room=' + R + '&v=' + V), R + '.' + V);
   assert.equal(roomOf('https://gifos.app/cast#room=' + R + '&v=' + V + '&at=1'), R + '.' + V);
-  assert.equal(roomOf('https://gifos.app/run.html#v=' + R + '&av=' + V + '&bc=1'), R + '.' + V);
+  assert.equal(roomOf('https://gifos.app/run.html#room=' + R + '&v=' + V + '&cast=1'), R + '.' + V);
+  assert.equal(roomOf('https://gifos.app/run.html#v=' + R + '&av=' + V + '&bc=1'), '', 'the old page-entry form names no room');
 });
 
 test('ACTIONS include rights and credentials', () => {

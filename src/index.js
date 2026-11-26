@@ -15,7 +15,7 @@ import { toWav, toPcm16 } from './audio.js';
 
 export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE };
 
-// The page address in agent mode. A hash that already carries meeting fields (#v=room) gets agent=1 too.
+// The page address in agent mode. A hash that already carries meeting fields (#room=room) gets agent=1 too.
 export function agentUrl(link) {
   const u = new URL(link);
   u.searchParams.set('agent', '1');
@@ -25,13 +25,13 @@ export function agentUrl(link) {
 }
 
 // The room in a meeting link: /meet#room=<room>[&v=<verifier>] (the link GifOS
-// hands out), the older /meet/<room> or /cast/<room>, or #v=<room>[&av=<verifier>] on the page itself.
+// hands out), the older /meet/<room> or /cast/<room>, or #room=<room>[&v=<verifier>] on the page itself.
+// The old #v=<room>&av=<verifier> form names no room.
 export function roomOf(link) {
   try {
     const u = new URL(link);
     const h = new URLSearchParams(u.hash.replace(/^#/, ''));
     if (h.get('room')) return h.get('room') + (h.get('v') ? '.' + h.get('v').toLowerCase() : '');
-    if (h.get('v')) return h.get('v') + (h.get('av') ? '.' + h.get('av') : '');
     const m = u.pathname.match(/\/(?:meet|cast|m)\/([^/?#]+)/);
     return m ? decodeURIComponent(m[1]) : '';
   } catch (e) { return ''; }

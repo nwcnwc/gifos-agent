@@ -47,7 +47,7 @@ const KEY = testKey();
 test('core transport: host from the site, contract carried, profile kept', gate, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gifos-agent-core-'));
   const fetch = fakeFetch(signSite({ 'js/core/node.js': HOST, 'js/core/files.json': '{"core":[]}' }, KEY));
-  const t = await coreTransport('https://example.test/run.html#v=abc&agent=1', { name: 'Ada (Sam’s assistant)', profile: dir, fetch, coreKeys: [KEY.pub], noWebrtc: true });
+  const t = await coreTransport('https://example.test/run.html#room=abc&agent=1', { name: 'Ada (Sam’s assistant)', profile: dir, fetch, coreKeys: [KEY.pub], noWebrtc: true });
   const meet = new Meeting(t);
   await t.ready(1000);
   assert.equal((await meet.state()).me.name, 'Ada (Sam’s assistant)');
