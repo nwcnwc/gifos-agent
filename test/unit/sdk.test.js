@@ -167,7 +167,7 @@ test('old path forms and the fragment form both name the room', () => {
   assert.equal(roomOf('https://gifos.app/meet#room=' + R), R);
   assert.equal(roomOf('https://gifos.app/meet#room=' + R + '&v=' + V), R + '.' + V);
   assert.equal(roomOf('https://gifos.app/cast#room=' + R + '&v=' + V + '&at=1'), R + '.' + V);
-  assert.equal(roomOf('https://gifos.app/run.html#room=' + R + '&v=' + V + '&cast=1'), R + '.' + V);
+  assert.equal(roomOf('https://gifos.app/versions/0.9.28.34/cast.html#room=' + R + '&v=' + V), R + '.' + V);
   assert.equal(roomOf('https://gifos.app/run.html#v=' + R + '&av=' + V + '&bc=1'), '', 'the old page-entry form names no room');
 });
 
