@@ -25,7 +25,7 @@ FAKE = textwrap.dedent(r'''
         if "join" in m:
             if m["opts"].get("name") == "NoOwner":
                 out({"id": m["id"], "ok": False, "error": "The name must say whose agent it is."}); continue
-            out({"id": m["id"], "ok": True, "core": bool(m["opts"].get("core")), "state": {"joined": True}})
+            out({"id": m["id"], "ok": True, "core": bool(m["opts"].get("core")), "link": m["join"] + ("&v=abc" if m["opts"].get("hostPassword") else ""), "state": {"joined": True}})
             continue
         c, a = m.get("call"), m.get("args") or {}
         if c == "chat":
@@ -59,6 +59,15 @@ FAKE = textwrap.dedent(r'''
         elif c == "credentials":
             raw = base64.b64decode(a.get("gif_b64") or "")
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "rights": {"signed": True, "meetings": 1, "bytes": raw.decode("ascii")}}})
+        elif c == "stage.play":
+            if not a.get("file", "").startswith("/"):
+                out({"id": m["id"], "ok": False, "error": "not an absolute path"}); continue
+            out({"id": m["id"], "ok": True, "answer": {"file": a["file"], "pos": a.get("startAt") or 0.1, "len": 100, "clear": a.get("clear")}})
+        elif c == "stage.playing":
+            out({"id": m["id"], "ok": True, "answer": None})
+        elif c == "stage.stop":
+            out({"id": m["id"], "ok": True, "answer": {"ok": True}})
+            out({"event": {"type": "played", "data": {"pos": 31, "len": 100, "early": True, "skips": 0, "why": "stopped"}}})
         elif c == "echo":
             out({"id": m["id"], "ok": True, "answer": {"ok": True, "log": log[:-1]}})
         elif c == "leave":
@@ -85,6 +94,27 @@ class MeetingTest(unittest.TestCase):
             self.assertIs(log[0]["opts"]["core"], False)      # core=False is what goes to the seat
             self.assertEqual(log[0]["opts"]["owner"], "Sam")
             await meet.leave()
+        self.run_async(go())
+
+    def test_host_password_listed_credentials_and_stage_play(self):
+        async def go():
+            meet = await join("https://example.invalid/cast#room=x", name="Pyra", owner="Sam", command=CMD,
+                              host_password="pw", listed="https://gifos.tv/l/x", credentials="pass.gif")
+            self.assertEqual(meet.link, "https://example.invalid/cast#room=x&v=abc")
+            o = (await meet.call("echo"))["log"][0]["opts"]
+            self.assertEqual(o["hostPassword"], "pw")
+            self.assertEqual(o["listed"], "https://gifos.tv/l/x")
+            self.assertTrue(os.path.isabs(o["credentials"]))
+            r = await meet.stage_play("clip.webm", start_at=12, clear=True)
+            self.assertTrue(os.path.isabs(r["file"]))
+            self.assertEqual((r["pos"], r["len"], r["clear"]), (12, 100, True))
+            self.assertIsNone(await meet.stage_playing())
+            await meet.stage_stop()
+            end = await asyncio.wait_for(r["ended"], 5)
+            self.assertEqual((end["early"], end["pos"], end["why"]), (True, 31, "stopped"))
+            r2 = await meet.stage_play("clip.webm")
+            await meet.leave()
+            self.assertEqual((await asyncio.wait_for(r2["ended"], 5))["why"], "closed")
         self.run_async(go())
 
     def test_core_true_joins_through_the_bridge(self):

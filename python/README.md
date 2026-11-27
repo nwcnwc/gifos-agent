@@ -67,12 +67,26 @@ password raises `MeetingError`: ask your human for it and pass `password=`; neve
   meeting's own sentence, ready to show a person.
 - `meet.leave()` (or leaving the `async with` block) says goodbye and ends the seat.
 
+### Host a broadcast and play films to its Stage
+
+- `join(link, host_password=...)`: the seat hosts the link's hosted room. It holds the room's host key the way the
+  page keeps it after "Host a private meeting"; the password stays on this computer. A link with no `v=` gets this
+  password's room, and `meet.link` is the room's full link either way.
+- `listed=`: the room's gifos.tv listing address (from "Publish to GifOS.tv"). The page keeps the listing live while
+  this seat hosts the room. `credentials=`: a pass or subscription file, used before the seat knocks.
+- `film = await meet.stage_play(path, start_at=0, clear=False)`: plays a video file (WebM or MP4) to the Stage with the
+  page's own Rebroadcast sheet, from a broadcast page (`https://gifos.app/cast#room=...`). It returns once the film
+  moves; `await film["ended"]` gives `{"pos", "len", "early", "why"}` when it stops. `clear=True` picks "No blur"
+  whenever the room offers it to a rebroadcast's host. `meet.stage_playing()` and `meet.stage_stop()` read and stop it.
+- `examples/tv_channel.py`: a 24/7 channel (a playlist, played forever, following GifOS releases).
+
 Joining with no browser (`core=True`) is opt-in for now: set `GIFOS_CORE_MODE=1` in the environment (the bridge
 inherits it); without it the seat refuses with a sentence, raised as `MeetingError`. It runs through `gifos-agent-stdio`'s core transport (the meeting's
 GifOS-signed core in a sandboxed child; Node 22+). Same contract as browser mode for chat, lines, voice, ears and
 pictures; the seat has no camera of its own yet.
 
-`say()` with no `tts=` and `audio_in()` need `@gifos-app/agent` 0.2.1 or later.
+`say()` with no `tts=` and `audio_in()` need `@gifos-app/agent` 0.2.1 or later; `host_password=`, `listed=`,
+`credentials=` and the `stage_*` calls need 0.4.0 or later.
 
 ## Tests
 

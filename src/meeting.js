@@ -37,7 +37,15 @@ export class Meeting {
       in: { open: (o) => self._portIn('video.in', o, (d) => ({ jpeg: d.jpeg ? Buffer.from(d.jpeg, 'base64') : null, rgb: d.rgb ? Buffer.from(d.rgb, 'base64') : null, width: d.w, height: d.h, blurred: !!d.blurred, ts: d.ts })) },
       out: { open: (o) => self._videoOut(o) },
     };
-    this.stage = { ask: () => this.call('stage.ask'), leave: () => this.call('stage.leave') };
+    this.stage = {
+      ask: () => this.call('stage.ask'),
+      leave: () => this.call('stage.leave'),
+      // Play a video file to the Stage, as the host of a broadcast does with Rebroadcast ("Choose a video"). Viewers
+      // see it marked Prerecorded. -> { pos, len, ended: Promise<{ pos, len, early, skips }> }
+      play: (file, o) => self._play(file, o),
+      playing: () => self._playing(),
+      stop: () => self._stopPlaying(),
+    };
     this.app = {
       run: (id) => this.call('app.run', { id }),
       stop: () => this.call('app.stop'),
@@ -172,6 +180,64 @@ export class Meeting {
   }
 
   // The actions as JSON-schema tools for any LLM loop. run(name, input) performs one.
+  // file: a path. o: startAt (seconds into the film), clear (pick "No blur" whenever the room offers it to a
+  // rebroadcast's host, so viewers see the film clear where the room allows it), guard (default true: a film that
+  // "ends" more than 8 s before its length is a spot the browser's decoder gave up on, and plays on past it).
+  // Browser mode only: it drives the page's own Rebroadcast sheet.
+  async _play(file, o = {}) {
+    if (this.closed) throw new Error('This meeting is closed.');
+    if (typeof this.t.playFile !== 'function') throw new Error('Playing a file to the Stage needs browser mode (join without { core: true }).');
+    const path = await import('node:path');
+    const fs = await import('node:fs');
+    const abs = path.resolve(String(file || ''));
+    if (!file || !fs.existsSync(abs)) throw new Error('No such file: ' + abs);
+    const r = await this.t.playFile(abs, o);
+    if (!r || r.ok === false) throw new Error((r && r.error) || 'The file did not start playing on the Stage.');
+    const self = this;
+    let last = { pos: r.pos || 0, len: r.len || 0, skips: 0 }, misses = 0;
+    if (this._play_end) this._play_end('replaced');
+    let resolveEnd;
+    const ended = new Promise((res) => { resolveEnd = res; });
+    let done = false;
+    const finish = (why) => {
+      if (done) return;
+      done = true;
+      clearInterval(t); if (self._play_end === finish) self._play_end = null;
+      const out = { file: abs, pos: last.pos, len: last.len, skips: last.skips, early: last.len > 0 && last.pos < last.len - 8, why };
+      self._event({ type: 'played', data: out });
+      resolveEnd(out);
+    };
+    let ticking = false;
+    const t = setInterval(async () => {
+      if (ticking) return;
+      ticking = true;
+      try {
+        if (self.closed) return finish('closed');
+        let st = null;
+        try { st = await self.t.playing(); misses = 0; } catch (e) { if (++misses >= 6) return finish('page'); return; }   // a page mid-load answers again soon
+        if (!st || !st.playing) return finish(last.len > 0 && last.pos >= last.len - 8 ? 'ended' : 'stopped');   // the page resets a stopped element to 0
+        last = { pos: st.pos, len: st.len, skips: st.skips };
+        if (o.clear) await self.t.pickClear().catch(() => {});
+      } finally { ticking = false; }
+    }, 500);
+    this._play_end = finish;
+    return { file: abs, pos: r.pos || 0, len: r.len || 0, ended };
+  }
+
+  // What is playing on the Stage now: { pos, len, paused, skips, trace } or null.
+  async _playing() {
+    if (typeof this.t.playing !== 'function') return null;
+    const st = await this.t.playing();
+    return st && st.playing ? { pos: st.pos, len: st.len, paused: st.paused, skips: st.skips, trace: st.trace } : null;
+  }
+
+  async _stopPlaying() {
+    if (typeof this.t.stopPlaying !== 'function') throw new Error('Nothing is playing on the Stage.');
+    const r = await this.t.stopPlaying();
+    if (!r || r.ok === false) throw new Error((r && r.error) || 'Nothing is playing on the Stage.');
+    return r;
+  }
+
   tools() { return toolsFor(this); }
 
   _end() {
@@ -179,6 +245,7 @@ export class Meeting {
     this.closed = true;
     for (const q of this.queues) q.end();
     for (const p of this.ports.values()) p.q.end();
+    if (this._play_end) this._play_end('closed');
     this.queues.clear(); this.ports.clear();
     this._closing = Promise.resolve().then(() => this.t.close()).catch(() => {});
     return this._closing;

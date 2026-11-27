@@ -12,6 +12,11 @@
 //     {"id":2,"ok":false,"error":"<the page's sentence>"}
 //     {"event":{"type":"line","data":{...}}}              every page event (video frames excepted; audio.in frames flow
 //                                                         only for a port the caller opened with audio.in.open)
+//   join opts also take hostPassword, listed and credentials (a file path), as join() in Node; the answer carries
+//   "link" (the room's link, with v= for a hosted room).
+//   the Stage, as Meeting.stage in Node (browser mode): {"call":"stage.play","args":{"file":"<path>","startAt":0,
+//   "clear":true}} answers {pos,len} once the film moves; {"call":"stage.playing"} answers it or null;
+//   {"call":"stage.stop"}. When a film stops the event {"type":"played","data":{pos,len,early,skips,why}} follows.
 //   say: {"call":"say","args":{"text":..,"wav":"<base64 WAV>"}} plays the caller's own speech audio; with no wav, this
 //   process voices the text with its own text-to-speech (kokoro-js beside the package), or answers "No voice".
 // Diagnostics go to stderr. The process leaves the meeting when stdin closes.
@@ -33,11 +38,11 @@ async function handle(m) {
     if (meet) return out({ id: m.id, ok: false, error: 'This seat already joined a meeting.' });
     const o = m.opts || {};
     try {
-      meet = await join(String(m.join), { name: o.name, owner: o.owner, notesTo: o.notesTo, password: o.password, core: !!o.core, coreKeys: Array.isArray(o.coreKeys) ? o.coreKeys.map(String) : undefined, relay: o.relay, profile: o.profile, voice: o.core ? false : o.voice, joinMs: o.joinMs, readyMs: o.readyMs });
+      meet = await join(String(m.join), { name: o.name, owner: o.owner, notesTo: o.notesTo, password: o.password, core: !!o.core, coreKeys: Array.isArray(o.coreKeys) ? o.coreKeys.map(String) : undefined, relay: o.relay, profile: o.profile, voice: o.core ? false : o.voice, joinMs: o.joinMs, readyMs: o.readyMs, hostPassword: o.hostPassword, listed: o.listed, credentials: o.credentials ? String(o.credentials) : undefined });
     } catch (e) { return out({ id: m.id, ok: false, error: String((e && e.message) || e) }); }
     meet.on('*', (ev) => { if (ev.type !== 'video.in.frame') out({ event: { type: ev.type, data: ev.data === undefined ? null : ev.data } }); });
     meet.on('left', () => { leave(0); });
-    return out({ id: m.id, ok: true, core: !!meet.core, state: await meet.state().catch(() => null) });
+    return out({ id: m.id, ok: true, core: !!meet.core, link: meet.link, state: await meet.state().catch(() => null) });
   }
   if (typeof m.call !== 'string') return out({ id: m.id, ok: false, error: 'Send {"join": link} or {"call": name, "args": {...}}.' });
   if (!meet) return out({ id: m.id, ok: false, error: 'Join a meeting first.' });
@@ -46,6 +51,9 @@ async function handle(m) {
   try {
     // say with no audio: the SDK's own voice makes it (Meeting.say); the caller hears say.done as an event
     if (m.call === 'say' && !a.wav) return out({ id: m.id, ok: true, answer: await meet.say(String(a.text || ''), { interrupt: a.interrupt, wait: false }) });
+    if (m.call === 'stage.play') { const r = await meet.stage.play(String(a.file || ''), { startAt: a.startAt, clear: !!a.clear, guard: a.guard }); return out({ id: m.id, ok: true, answer: { file: r.file, pos: r.pos, len: r.len } }); }
+    if (m.call === 'stage.playing') return out({ id: m.id, ok: true, answer: await meet.stage.playing() });
+    if (m.call === 'stage.stop') return out({ id: m.id, ok: true, answer: await meet.stage.stop() });
     out({ id: m.id, ok: true, answer: await meet.call(m.call, a) });
   }
   catch (e) { out({ id: m.id, ok: false, error: String((e && e.message) || e) }); }
@@ -58,5 +66,6 @@ rl.on('line', (line) => {
   handle(m || {}).catch((e) => out({ id: m && m.id, ok: false, error: String((e && e.message) || e) }));
 });
 rl.on('close', () => { leave(0); });
+process.stdout.on('error', () => { leave(0); });   // the caller is gone (EPIPE): leave the meeting, never crash
 process.on('SIGTERM', () => { leave(0); });
 process.on('SIGINT', () => { leave(0); });

@@ -136,6 +136,8 @@ class Meeting:
         self._unclaimed = {}  # frames of a port whose open answer is still on its way to audio_in()
         self.closed = False
         self.core = False
+        self.link = None
+        self._played = []  # futures waiting for the film now on the Stage to stop
         self.app = _App(self)
         self._reader = asyncio.ensure_future(self._read())
 
@@ -183,6 +185,11 @@ class Meeting:
             for q, flt in list(self._queues):
                 if _line_matches(d, **flt):
                     q.put_nowait(d)
+        if t == "played":
+            waiting, self._played = self._played, []
+            for fut in waiting:
+                if not fut.done():
+                    fut.set_result(d)
         if t == "left":
             self._finish()
 
@@ -206,6 +213,10 @@ class Meeting:
             if not fut.done():
                 fut.set_exception(MeetingError(why))
         self._waiting.clear()
+        for fut in self._played:
+            if not fut.done():
+                fut.set_result({"why": "closed"})
+        self._played = []
 
     async def _send(self, msg):
         if self.closed:
@@ -284,6 +295,31 @@ class Meeting:
     async def stage_leave(self):
         return await self.call("stage.leave")
 
+    async def stage_play(self, file, start_at=0, clear=False, guard=True):
+        """Play a video file (WebM or MP4) to the Stage, as the host of a broadcast does with Rebroadcast ("Choose a
+        video"); viewers see it marked Prerecorded. Browser mode, from a broadcast page this seat hosts
+        (gifos.app/cast#room=..., join with host_password=). Returns once the film moves: {"file", "pos", "len",
+        "ended"}, where "ended" is a future of {"pos", "len", "early", "skips", "why"} for when it stops.
+        start_at: seconds into the film. clear: pick "No blur" whenever the room offers it to a rebroadcast's host.
+        guard: a film that "ends" more than 8 s before its length hit a spot the browser gave up on; it plays on."""
+        path = os.path.abspath(str(file))
+        r = (await self._send({"call": "stage.play", "args": {"file": path, "startAt": float(start_at or 0), "clear": bool(clear), "guard": bool(guard)}})).get("answer") or {}
+        ended = asyncio.get_running_loop().create_future()
+        if self.closed:
+            ended.set_result({"why": "closed"})
+        else:
+            self._played.append(ended)
+        r["ended"] = ended
+        return r
+
+    async def stage_playing(self):
+        """What is playing on the Stage now: {"pos", "len", "paused", "skips", "trace"}, or None."""
+        return (await self._send({"call": "stage.playing"})).get("answer")
+
+    async def stage_stop(self):
+        """Stop the film playing on the Stage."""
+        return await self.call("stage.stop")
+
     async def transcript(self, since=0):
         """The room's lines this seat already holds (chat, captions, the agent's own spoken lines), newest last."""
         return (await self.call("lines", {"since": since})).get("lines") or []
@@ -359,14 +395,18 @@ class Meeting:
         await self.leave()
 
 
-async def join(url, name=None, owner=None, core=False, password=None, relay=None, profile=None, join_ms=None, command=None, core_keys=None, tts=None, voice=None):
+async def join(url, name=None, owner=None, core=False, password=None, relay=None, profile=None, join_ms=None, command=None, core_keys=None, tts=None, voice=None, host_password=None, listed=None, credentials=None):
     """Join a meeting and return its Meeting once the seat is in. The Node seat drives the meeting page in a Chrome or
     Edge already on this computer (or a Chromium installed for Playwright; GIFOS_CHROME names one). The name must say
     whose agent it is ("Ada (Sam's assistant)", or name="Ada", owner="Sam"). A room with a password raises
     MeetingError: ask your human for it and pass password=. tts: text -> WAV bytes or (pcm, rate), sync or async, the
     voice of say(); without it the Node seat's own voice (kokoro-js) is used; voice=False turns that off.
     core=True joins with no browser (opt-in for now: set GIFOS_CORE_MODE=1, else MeetingError): it runs through gifos-agent-stdio's core transport (the meeting's GifOS-signed
-    core in a sandboxed child; Node 22+). core_keys: public keys (base64) to trust for a core you signed yourself."""
+    core in a sandboxed child; Node 22+). core_keys: public keys (base64) to trust for a core you signed yourself.
+    host_password: host the link's hosted room (the seat holds the room's host key; the password stays on this
+    computer). A link with no v= gets this password's room; meet.link is the room's link. listed: the room's gifos.tv
+    listing address (from "Publish to GifOS.tv"): the page keeps it live while this seat hosts. credentials: a
+    credentials GIF file (a subscription file or a pass) used before the seat knocks."""
     cmd = list(command or bridge_command())
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdin=asyncio.subprocess.PIPE,
@@ -376,7 +416,8 @@ async def join(url, name=None, owner=None, core=False, password=None, relay=None
                            "or later and the @gifos-app/agent package: npm install -g @gifos-app/agent (or set "
                            "GIFOS_AGENT_BRIDGE to its src/stdio.js).") from None
     meet = Meeting(proc, tts=tts, cmd=cmd)
-    opts = {"name": name, "owner": owner, "core": bool(core), "password": password, "relay": relay, "profile": profile, "joinMs": join_ms, "coreKeys": list(core_keys) if core_keys else None, "voice": voice}
+    opts = {"name": name, "owner": owner, "core": bool(core), "password": password, "relay": relay, "profile": profile, "joinMs": join_ms, "coreKeys": list(core_keys) if core_keys else None, "voice": voice,
+            "hostPassword": host_password, "listed": listed, "credentials": os.path.abspath(credentials) if credentials else None}
     try:
         r = await meet._send({"join": url, "opts": {k: v for k, v in opts.items() if v is not None}})
     except MeetingError:
@@ -386,5 +427,6 @@ async def join(url, name=None, owner=None, core=False, password=None, relay=None
         await proc.wait()
         raise
     meet.core = bool(r.get("core"))
+    meet.link = r.get("link")
     meet.joined = True
     return meet

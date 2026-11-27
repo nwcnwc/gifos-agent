@@ -17,5 +17,5 @@ room rule stays with the meeting: chat, lines, people, hands, the Stage, apps, v
 """
 from .meeting import Meeting, MeetingError, join, bridge_command, to_wav
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["Meeting", "MeetingError", "join", "bridge_command", "to_wav", "__version__"]

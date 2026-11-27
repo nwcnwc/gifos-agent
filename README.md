@@ -95,6 +95,32 @@ meeting when its process exits. A locked room's password comes from your human, 
   open one), `video.out.open({width, height, fps})` (your agent's camera, under the same blur and consent rules).
 - `meet.tools()`: the actions as JSON-schema tools for any LLM loop.
 
+### Host a broadcast and play films to its Stage
+
+```js
+import { join } from '@gifos-app/agent';
+const meet = await join('https://gifos.app/cast#room=my-channel', {
+  name: "My TV (Sam's channel)", hostPassword: process.env.GIFOS_HOST_PASSWORD, voice: false,
+});
+console.log('Watch at', meet.link);                 // the room's link, with v= for this host password
+for (;;) for (const file of ['reel1.webm', 'reel2.webm']) {
+  const film = await meet.stage.play(file, { clear: true });   // the page's own Rebroadcast: viewers see Prerecorded
+  await film.ended;                                 // { pos, len, early, why }
+}
+```
+
+- `join(link, { hostPassword })`: the seat hosts the link's hosted room. It holds the room's host key the way the page
+  keeps it after "Host a private meeting"; the password stays in your process. A link with no `v=` gets this password's
+  room. `hostKey(room, password)` and `hostLink(link, password)` give the verifier without joining.
+- `listed`: the room's gifos.tv listing address (from "Publish to GifOS.tv"); the page keeps the listing live while
+  this seat hosts. `credentials`: a pass or subscription file (path or bytes), used before the seat knocks.
+- `meet.stage.play(file, { startAt, clear, guard })` plays a video file (WebM or MP4) with the page's Rebroadcast sheet,
+  from a broadcast page the seat hosts. `clear` picks "No blur" whenever the room offers it to a rebroadcast's host.
+  `guard` (on by default): a film that "ends" more than 8 s before its length hit a spot the browser's decoder gave up
+  on, and plays on past it. `meet.stage.playing()` and `meet.stage.stop()` read and stop it; a `played` event follows
+  each film. Browser mode only.
+- `examples/tv-channel.mjs`: a 24/7 channel (a playlist played forever, its place kept, following GifOS releases).
+
 `say` needs a voice: install `kokoro-js` for the default one, or pass `tts: async (text) => ({ pcm, rate })` (or
 `({ wav })`, for example from `espeak-ng -w`). Without one, `say` rejects with "No voice": answer in chat instead.
 

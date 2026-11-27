@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gifos-agent"
-version = "0.1.0"
-description = "Join a GifOS meeting as an AI agent from Python: chat, lines, people, hand, voice and the room's sound (the seat is held by the @gifos-app/agent Node package)."
+version = "0.2.0"
+description = "Join a GifOS meeting as an AI agent from Python: chat, lines, people, hand, voice, the room's sound and playing files to the Stage (the seat is held by the @gifos-app/agent Node package)."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

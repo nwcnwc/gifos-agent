@@ -13,8 +13,9 @@ import { kokoroTts } from './tts.js';
 import { CORE_MODE, CORE_MODE_OFF } from './flags.js';
 import { toWav, toPcm16 } from './audio.js';
 import { siteVersion, watchSite, compareVersions } from './site.js';
+import { hostKey, hostLink } from './host.js';
 
-export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE, siteVersion, watchSite, compareVersions };
+export { Meeting, agentName, lineMatches, PROTOCOL, EVENTS, ACTIONS, toWav, toPcm16, playwrightTransport, coreTransport, GIFOS_CORE_KEYS, MIN_CORE_BUILD, signedBytes, fetchSignedCore, CORE_MODE, siteVersion, watchSite, compareVersions, hostKey, hostLink };
 
 // The page address in agent mode. A hash that already carries meeting fields (#room=room) gets agent=1 too.
 export function agentUrl(link) {
@@ -53,7 +54,7 @@ function seated(meet, ms) {
   });
 }
 
-// join(url, { name, owner?, core?, tts?, voice?, password?, relay?, profile?, headless?, joinMs?, chromium?, meshC? }) -> Meeting
+// join(url, { name, owner?, core?, tts?, voice?, password?, hostPassword?, listed?, credentials?, relay?, profile?, headless?, joinMs?, chromium?, meshC? }) -> Meeting
 // chromium: a Playwright `chromium` you already load (your own Playwright install); by default the SDK loads its own.
 // core: true joins with no browser: the meeting's own core, signed by GifOS, runs in a sandboxed child process (loaded
 // from the meeting's site; docs/core-trust.md; coreKeys trusts your own signing key instead) over real WebRTC.
@@ -61,24 +62,43 @@ function seated(meet, ms) {
 // No camera of its own yet: video.out answers that it cannot make a camera with no browser.
 // meshC (core only, for tests): room shape C (2..5). deriveMeet folds a C other than 5 into the relay session id: every seat of the room
 // must carry the same C, and a non-default C only takes effect with DEBUG=on in the link (gifos-net.js SCALE.C).
+// hostPassword: host the link's hosted room. The seat holds the room's host key (derived here; the password stays in
+// this process) the way the page keeps it after "Host a private meeting", so it joins as the room's host. A link with
+// no v= gets this password's verifier; meet.link is the room's link either way.
+// listed: the room's gifos.tv listing (the address "Publish to GifOS.tv" gave). The page then keeps the listing live
+// while this seat hosts the room: its on-air note, a keep-alive every few minutes, its off-air note when it leaves.
+// credentials: a credentials GIF (a subscription file or a pass; a path or the bytes), used before the seat knocks.
 export async function join(url, opts = {}) {
   if (opts.core && !CORE_MODE) throw new Error(CORE_MODE_OFF);
   const name = agentName(opts.name, opts.owner);
+  let store = {};
+  if (opts.hostPassword) {
+    if (opts.core) throw new Error('hostPassword works in browser mode for now (join without { core: true }).');
+    const h = hostLink(url, opts.hostPassword);
+    url = h.link;
+    store['gifos_vadm_' + h.room + '.' + h.verifier] = h.key;
+    if (opts.listed) {
+      if (!/^https:\/\/\S+$/.test(String(opts.listed))) throw new Error('listed is the room\'s gifos.tv listing address (https://...).');
+      store['gifos_tv:' + h.room + '.' + h.verifier] = JSON.stringify({ url: String(opts.listed), at: Date.now() });
+    }
+  } else if (opts.listed) throw new Error('listed needs hostPassword: only the room\'s host keeps its listing live.');
   // The agent's own profile keeps its person key, so it is the same person across joins.
   const profile = opts.profile || path.join(os.homedir(), '.gifos-agent', slug(name) + '-' + crypto.createHash('sha256').update(name).digest('hex').slice(0, 6));
   if (opts.core) return joinCore(url, name, profile, opts);
   const chromium = opts.chromium || (await import('playwright')).chromium;
   const { context, used } = await launch(chromium, profile, opts);
   const page = context.pages()[0] || await context.newPage();
-  const transport = await playwrightTransport(page, { name, relay: opts.relay, room: roomOf(url), password: opts.password, onClose: () => context.close() });
+  const transport = await playwrightTransport(page, { name, relay: opts.relay, room: roomOf(url), password: opts.password, store, onClose: () => context.close() });
   const tts = opts.tts || (opts.voice === false ? null : await kokoroTts(opts.kokoro || {}));
   const meet = new Meeting(transport, { tts });
   meet.browser = used;
   meet.page = page;
+  meet.link = url;
   const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);
   try {
     await page.goto(agentUrl(url), { waitUntil: 'domcontentloaded' });
     await transport.ready(opts.readyMs === undefined ? 60000 : opts.readyMs);
+    if (opts.credentials) meet.rightsAtJoin = await meet.useCredentials(opts.credentials);
     const st = await meet.state().catch(() => null);
     if (!(st && st.joined)) await sit; else sit.catch(() => {});
     if (opts.owner || opts.notesTo) await meet.profile({ owner: opts.owner, notesTo: opts.notesTo }).catch(() => {});
@@ -95,9 +115,11 @@ async function joinCore(url, name, profile, opts) {
   const transport = await coreTransport(agentUrl(url), { name, relay: opts.relay, room: roomOf(url), password: opts.password, profile, coreKeys: opts.coreKeys, log: opts.log, meshC: opts.meshC });
   const meet = new Meeting(transport, { tts });
   meet.core = true;
+  meet.link = url;
   const sit = seated(meet, opts.joinMs === undefined ? 120000 : opts.joinMs);
   try {
     await transport.ready(opts.readyMs === undefined ? 60000 : opts.readyMs);
+    if (opts.credentials) meet.rightsAtJoin = await meet.useCredentials(opts.credentials);
     const st = await meet.state().catch(() => null);
     if (!(st && st.joined)) await sit; else sit.catch(() => {});
     if (opts.owner || opts.notesTo) await meet.profile({ owner: opts.owner, notesTo: opts.notesTo }).catch(() => {});
