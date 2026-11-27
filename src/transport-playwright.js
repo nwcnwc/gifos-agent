@@ -102,17 +102,17 @@ export async function playwrightTransport(page, cfg = {}) {
     async close() { if (closed) return; closed = true; try { await cfg.onClose?.(); } catch (e) {} },
     playFile: (file, o) => playFile(page, file, o),
     playing: () => page.evaluate(playState),
+    // The Rebroadcast bar's buttons. In agent mode the page draws no chrome, so they exist without being on screen: the
+    // SDK presses the page's own button (its click handler), never a page internal.
     async stopPlaying() {
-      const r = await page.evaluate(() => { const b = document.getElementById('rb-stop'); if (!b || !b.getClientRects().length) return false; b.click(); return true; });
+      const r = await page.evaluate(() => { const b = document.getElementById('rb-stop'); if (!b) return false; b.click(); return true; });
       return r ? { ok: true } : { ok: false, error: 'Nothing is playing on the Stage.' };
     },
-    // The host's "No blur" pick on the Rebroadcast bar, where the room lets viewers see a rebroadcast clear. The page
-    // offers it again whenever that right changes, so it is picked whenever offered. A real click, as a person makes it.
+    // The host's "No blur" pick on the Rebroadcast bar. The page puts the button there only while the room lets viewers
+    // tap to unblur a rebroadcast, and offers it again (aria-pressed false) whenever that right changes, so it is
+    // pressed whenever offered.
     async pickClear() {
-      const offered = await page.evaluate(() => { const b = document.getElementById('rb-blur'); return !!(b && b.getAttribute('aria-pressed') === 'false' && b.getClientRects().length); });
-      if (!offered) return false;
-      await page.locator('#rb-blur').click({ timeout: 3000 });
-      return true;
+      return page.evaluate(() => { const b = document.getElementById('rb-blur'); if (!(b && b.getAttribute('aria-pressed') === 'false')) return false; b.click(); return true; });
     },
   };
 }
